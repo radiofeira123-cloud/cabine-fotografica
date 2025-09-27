@@ -1,5 +1,31 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><title>Cabine - PC</title></head>
-<body><h1>PC Central</h1><script src="pc.js"></script></body>
+<head>
+  <meta charset="UTF-8">
+  <title>Cabine - PC</title>
+  <!-- Biblioteca QRCode.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    button { margin: 5px; padding: 10px; }
+    #galeria { display: flex; flex-wrap: wrap; margin-top: 20px; }
+    #galeria div { position: relative; margin: 5px; }
+    #galeria img { width: 200px; }
+    #galeria button { position: absolute; top: 0; right: 0; }
+    #qrContainer { margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+  <h1>PC Central</h1>
+
+  <div id="qrContainer"></div>
+
+  <button id="btnGerarQR">Gerar QR Code do controle</button>
+  <button id="btnIniciar">Iniciar sessão</button>
+  <button id="btnFinalizar">Finalizar sessão</button>
+
+  <div id="galeria"></div>
+
+  <script src="pc.js"></script>
+</body>
 </html>
