@@ -2,7 +2,8 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Visualizador de Fotos - Cabine</title>
+  <title>Suas Fotos - Cabine Fotográfica</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     * {
       margin: 0;
@@ -30,31 +31,40 @@
     h1 {
       text-align: center;
       color: #2c3e50;
+      margin-bottom: 10px;
+      font-size: 2.2rem;
+    }
+    
+    .subtitle {
+      text-align: center;
+      color: #7f8c8d;
       margin-bottom: 30px;
-      font-size: 2.5rem;
+      font-size: 1.1rem;
     }
     
     .session-info {
       background: #f8f9fa;
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 20px;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 30px;
       text-align: center;
+      border-left: 5px solid #3498db;
     }
     
     .photos-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
+      gap: 25px;
       margin-top: 20px;
     }
     
     .photo-item {
       background: white;
       border-radius: 15px;
-      padding: 15px;
-      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      padding: 20px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.1);
       transition: transform 0.3s ease;
+      text-align: center;
     }
     
     .photo-item:hover {
@@ -63,47 +73,138 @@
     
     .photo-item img {
       width: 100%;
-      height: 200px;
-      object-fit: cover;
+      max-width: 100%;
+      height: 250px;
+      object-fit: contain;
       border-radius: 10px;
+      margin-bottom: 15px;
+      background: #f8f9fa;
       cursor: pointer;
+    }
+    
+    .photo-number {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #2c3e50;
       margin-bottom: 10px;
     }
     
     .photo-actions {
-      text-align: center;
+      margin-top: 15px;
     }
     
     .download-btn {
       background: #3498db;
       color: white;
       border: none;
-      padding: 10px 20px;
-      border-radius: 5px;
+      padding: 12px 25px;
+      border-radius: 8px;
       cursor: pointer;
       font-weight: bold;
+      font-size: 1rem;
       transition: background 0.3s ease;
+      width: 100%;
     }
     
     .download-btn:hover {
       background: #2980b9;
+      transform: translateY(-2px);
     }
     
     .empty-state {
       text-align: center;
-      padding: 40px;
+      padding: 60px 20px;
       color: #7f8c8d;
     }
     
     .empty-state .icon {
       font-size: 4rem;
       margin-bottom: 20px;
+      opacity: 0.5;
+    }
+    
+    .photo-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.95);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+    
+    .photo-modal img {
+      max-width: 90%;
+      max-height: 90%;
+      object-fit: contain;
+      border-radius: 10px;
+    }
+    
+    .close-modal {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255,255,255,0.2);
+      color: white;
+      border: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+    
+    @media (max-width: 768px) {
+      .container {
+        padding: 20px;
+        margin: 10px;
+      }
+      
+      h1 {
+        font-size: 1.8rem;
+      }
+      
+      .photos-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+      
+      .photo-item {
+        padding: 15px;
+      }
+      
+      .download-btn {
+        padding: 15px;
+        font-size: 1.1rem;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      body {
+        padding: 10px;
+      }
+      
+      .container {
+        padding: 15px;
+      }
+      
+      .session-info {
+        padding: 15px;
+      }
+      
+      .photo-item img {
+        height: 200px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🎉 Suas Fotos da Cabine</h1>
+    <p class="subtitle">Memórias especiais para guardar</p>
     
     <div class="session-info" id="sessionInfo">
       Carregando suas fotos...
@@ -117,6 +218,103 @@
     </div>
   </div>
 
-  <script src="visualizador.js"></script>
+  <div class="photo-modal" id="photoModal">
+    <button class="close-modal" onclick="closeModal()">×</button>
+    <img id="modalImage" src="" alt="Foto ampliada">
+  </div>
+
+  <script>
+    function decodeSession(enc) {
+      try {
+        const json = decodeURIComponent(escape(atob(enc)));
+        return JSON.parse(json);
+      } catch(e) {
+        console.error("Erro ao decodificar sessão:", e);
+        return null;
+      }
+    }
+
+    function openModal(imageUrl) {
+      const modal = document.getElementById('photoModal');
+      const modalImage = document.getElementById('modalImage');
+      modalImage.src = imageUrl;
+      modal.style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('photoModal').style.display = 'none';
+    }
+
+    window.addEventListener('load', () => {
+      const params = new URLSearchParams(location.search);
+      const enc = params.get('session');
+      const container = document.getElementById('fotosContainer');
+      const sessionInfo = document.getElementById('sessionInfo');
+      
+      if(!enc) {
+        sessionInfo.innerHTML = '<span style="color: #e74c3c;">❌ Sessão inválida ou expirada</span>';
+        container.innerHTML = '<div class="empty-state"><div class="icon">❌</div><p>Sessão não encontrada</p></div>';
+        return;
+      }
+      
+      const sess = decodeSession(enc);
+      if(!sess || !sess.images || sess.images.length === 0) {
+        sessionInfo.innerHTML = '<span style="color: #e74c3c;">❌ Nenhuma foto encontrada nesta sessão</span>';
+        container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><p>Nenhuma foto disponível</p></div>';
+        return;
+      }
+      
+      // Atualizar informações da sessão
+      sessionInfo.innerHTML = `
+        <strong>✅ Sessão carregada com sucesso!</strong><br>
+        <small>${sess.photoCount} foto${sess.photoCount !== 1 ? 's' : ''} • ${new Date(sess.createdAt).toLocaleString('pt-BR')}</small>
+      `;
+      
+      // Limpar container
+      container.innerHTML = '';
+      
+      // Adicionar fotos
+      sess.images.forEach((url, idx) => {
+        const photoDiv = document.createElement('div');
+        photoDiv.className = 'photo-item';
+        
+        photoDiv.innerHTML = `
+          <div class="photo-number">Foto ${idx + 1}</div>
+          <img src="${url}" alt="Foto ${idx + 1} da cabine" onclick="openModal('${url}')">
+          <div class="photo-actions">
+            <button class="download-btn" onclick="downloadPhoto('${url}', ${idx + 1})">
+              ⬇️ Baixar Foto ${idx + 1}
+            </button>
+          </div>
+        `;
+        
+        container.appendChild(photoDiv);
+      });
+    });
+
+    function downloadPhoto(url, number) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `cabine_foto_${number}.jpg`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Fechar modal clicando fora da imagem
+    document.getElementById('photoModal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+
+    // Fechar com ESC
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        closeModal();
+      }
+    });
+  </script>
 </body>
 </html>
