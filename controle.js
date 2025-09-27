@@ -1,4 +1,4 @@
-// controle.js - celular da cabine (mantém tudo, não remova partes)
+// controle.js - celular da cabine
 const WS_URL = "wss://chatcabinerender.onrender.com";
 const MOLDURA_PATH = "assets/moldura.png";
 const VIDEO_PATH = "assets/video-instrucoes.mp4";
@@ -33,6 +33,8 @@ const canvasHidden = document.getElementById("canvasHidden");
 videoInstr.src = VIDEO_PATH;
 videoInstr.play().catch(()=>{});
 
+let isCapturing = false; // 🔒 trava para não disparar outra sessão
+
 // handle incoming messages if needed
 function handleMsg(msg){
   if(msg.type === "end-session"){
@@ -42,9 +44,7 @@ function handleMsg(msg){
 
 async function enterFullscreen(){
   try { await document.documentElement.requestFullscreen(); } catch(e){ console.warn("fs failed", e); }
-  // notify PC to hide control QR
   if(ws && ws.readyState===1) ws.send(JSON.stringify({ type:"control-fullscreen", sessionId }));
-  // start waiting for tap to actually begin (we already have a button to open FS)
   await waitForTapStart();
 }
 
@@ -52,40 +52,44 @@ tapBtn.addEventListener("click", enterFullscreen);
 
 function waitForTapStart(){
   return new Promise((resolve)=>{
-    const handler = ()=> { document.removeEventListener("pointerdown", handler); resolve(); };
+    const handler = ()=> { 
+      document.removeEventListener("pointerdown", handler); 
+      resolve(); 
+    };
     document.addEventListener("pointerdown", handler, { once:true });
   }).then(()=> startPhotoFlow());
 }
 
 async function startPhotoFlow(){
-  // hide instruction video, start camera
+  if(isCapturing) return; // 🚫 não inicia de novo
+  isCapturing = true;     // 🔒 trava sessão
+
   videoInstr.style.display = "none";
   videoCam.style.display = "block";
   overlay.innerText = "";
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
     videoCam.srcObject = stream;
     await videoCam.play();
   } catch(e){
     console.error("camera erro", e);
+    isCapturing = false;
     return;
   }
 
-  // prepare moldura image
   const mold = new Image();
   mold.crossOrigin = "anonymous";
   mold.src = MOLDURA_PATH;
 
-  // short "prepare" message
   await showOverlayText("Prepare-se para tirar suas fotos", 1500);
 
   for(let i=1;i<=3;i++){
-    await countdownOverlay(5);
+    await countdownOverlay(3); 
     const blob = await captureFramedPhoto(videoCam, mold);
     const dataURL = await blobToDataURL(blob);
-    // show preview with mold applied
     showPreview(dataURL);
-    // send to PC via WS
+
     if(ws && ws.readyState===1){
       ws.send(JSON.stringify({ type: "photo", sessionId, filename: `photo_${Date.now()}_${i}.jpg`, data: dataURL }));
     }
@@ -95,11 +99,10 @@ async function startPhotoFlow(){
 
   await showOverlayText("✅ Sucesso! Obrigado por utilizar a cabine fotográfica 😃", 2200);
 
-  // after finishing, keep camera open but wait for PC to end session or timeout
-  // we'll not auto-reset here; PC triggers end-session
   if(ws && ws.readyState===1){
     ws.send(JSON.stringify({ type: "control-session-done", sessionId }));
   }
+  // ⚠️ NÃO libera a flag, só volta quando o PC mandar "end-session"
 }
 
 function captureFramedPhoto(videoEl, moldImage){
@@ -125,7 +128,6 @@ function blobToDataURL(blob){
 }
 
 function showPreview(dataURL){
-  // create or reuse an img overlay
   if(!document.getElementById("__previewImg")){
     const img = document.createElement("img");
     img.id = "__previewImg";
@@ -141,7 +143,6 @@ function showPreview(dataURL){
   const img = document.getElementById("__previewImg");
   img.src = dataURL;
   img.style.display = "block";
-  // hide camera
   videoCam.style.display = "none";
 }
 
@@ -171,19 +172,20 @@ function countdownOverlay(sec){
       overlayCount.innerText = i;
       await sleep(1000);
     }
+    overlayCount.innerText = "📸";
+    await sleep(700);
     document.body.removeChild(overlayCount);
     resolve();
   });
 }
 
 function resetToIntro(){
-  // stop camera
   try { if(videoCam.srcObject){ videoCam.srcObject.getTracks().forEach(t=>t.stop()); videoCam.srcObject = null; } } catch(e){ console.warn(e); }
-  // show instruction again
   videoInstr.style.display = "block";
   videoCam.style.display = "none";
   overlay.innerText = "";
   if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+  isCapturing = false; // 🔓 libera aqui para próxima sessão
 }
 
 function sleep(ms){ return new Promise(r=>setTimeout(r, ms)); }
