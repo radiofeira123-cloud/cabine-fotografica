@@ -1,4 +1,4 @@
-// pc.js - PC Central
+// pc.js - PC Central (corrigido para aceitar offer -> responder answer e receber fotos)
 // ATENÇÃO: mantenha exatamente este arquivo (não remova partes).
 const WS_URL = "wss://chatcabinerender.onrender.com"; // seu servidor Render
 const IMGBB_API_KEY = "6734e028b20f88d5795128d242f85582"; // sua API key
@@ -18,34 +18,57 @@ function connectWS(){
   ws = new WebSocket(WS_URL);
   ws.onopen = () => {
     console.log("[PC] WS aberto");
+    // registrar como PC - servidor retornará sessionId gerado
     ws.send(JSON.stringify({ type: "register", role: "pc" }));
   };
   ws.onmessage = (ev) => {
     try {
       const msg = JSON.parse(ev.data);
+      console.log("[PC] WS msg recebida:", msg.type || msg);
       handleMessage(msg);
-    } catch(e){ console.error("[PC] parse msg", e); }
+    } catch(e){ console.error("[PC] parse msg error", e, ev.data); }
   };
   ws.onclose = ()=> { console.log("[PC] WS fechado, reconectando em 2s"); setTimeout(connectWS,2000); };
   ws.onerror = (e)=> console.error("[PC] WS error", e);
 }
 
+/* message handling */
 function handleMessage(msg){
+  if(!msg || !msg.type) return;
   if(msg.type === "registered"){
+    // servidor retornou sessionId para este PC
     sessionId = msg.sessionId;
     console.log("[PC] registrado sessionId=", sessionId);
   } else if(msg.type === "photo"){
-    // photo from control: msg.data is dataURL
-    addPhotoLocal(msg.filename, msg.data);
-  } else if(msg.type === "webrtc-offer"){
-    // offer contains sdp and from
-    startWebRTCReceive(msg.sdp, msg.from);
+    // photo from control: accept data or dataURL
+    const dataURL = msg.data || msg.dataURL;
+    const filename = msg.filename || (`photo_${Date.now()}.jpg`);
+    if(dataURL){
+      addPhotoLocal(filename, dataURL);
+    } else {
+      console.warn("[PC] photo message sem data");
+    }
+  } else if(msg.type === "offer" || msg.type === "webrtc-offer"){
+    // celular enviou oferta (campo pode ser 'offer' objeto ou 'sdp')
+    // normalize offerSDP
+    let offerSDP = null;
+    if(msg.offer && msg.offer.sdp) offerSDP = msg.offer.sdp;
+    else if(msg.sdp) offerSDP = msg.sdp;
+    else if(msg.offer && typeof msg.offer === "string") offerSDP = msg.offer;
+    if(offerSDP){
+      console.log("[PC] recebida oferta WebRTC, iniciando receiver");
+      startWebRTCReceive(offerSDP);
+    } else {
+      console.warn("[PC] offer sem sdp", msg);
+    }
   } else if(msg.type === "control-fullscreen"){
     // hide QR (control entered fullscreen)
     clearQR();
   } else if(msg.type === "end-session"){
     // control signaled session end
     console.log("[PC] control ended session");
+  } else {
+    console.log("[PC] mensagem não tratada:", msg.type);
   }
 }
 
@@ -94,7 +117,7 @@ async function finalizarSessao(){
   if(fotos.length === 0) { alert("Nenhuma foto na sessão."); return; }
 
   btnGerarVisualizador.disabled = true;
-  // upload all fotos
+  // upload all photos
   const uploaded = [];
   for(const f of fotos){
     try {
@@ -141,35 +164,44 @@ async function finalizarSessao(){
 let pcReceiver = null;
 let dataChannelReceiver = null;
 
-async function startWebRTCReceive(offerSDP, fromId){
+async function startWebRTCReceive(offerSDP){
   // cria RTCPeerConnection
-  if(pcReceiver) {
-    pcReceiver.close();
-    pcReceiver = null;
-  }
-  pcReceiver = new RTCPeerConnection();
-  pcReceiver.ontrack = (e) => {
-    // primeira track de vídeo -> attach to videoPC
-    try {
-      videoPC.srcObject = e.streams[0];
-      videoPC.play().catch(()=>{});
-    } catch(err){ console.error(err); }
-  };
-  pcReceiver.ondatachannel = (ev) => {
-    dataChannelReceiver = ev.channel;
-    dataChannelReceiver.onmessage = (e) => {
-      // caso precise mensagens extras
-      console.log("[PC] dataChannel msg:", e.data);
+  try {
+    if(pcReceiver) {
+      pcReceiver.close();
+      pcReceiver = null;
+    }
+    pcReceiver = new RTCPeerConnection();
+
+    pcReceiver.ontrack = (e) => {
+      // primeira track de vídeo -> attach to videoPC
+      try {
+        videoPC.srcObject = e.streams[0];
+        videoPC.play().catch(()=>{});
+      } catch(err){ console.error("[PC] ontrack error", err); }
     };
-  };
 
-  await pcReceiver.setRemoteDescription({ type: "offer", sdp: offerSDP });
-  const answer = await pcReceiver.createAnswer();
-  await pcReceiver.setLocalDescription(answer);
+    pcReceiver.ondatachannel = (ev) => {
+      dataChannelReceiver = ev.channel;
+      dataChannelReceiver.onmessage = (e) => {
+        console.log("[PC] dataChannel msg:", e.data);
+      };
+    };
 
-  // enviar answer via signaling
-  if(ws && ws.readyState===1){
-    ws.send(JSON.stringify({ type: "webrtc-answer", sessionId, to: fromId, sdp: pcReceiver.localDescription.sdp }));
+    // set remote (offer) and create answer
+    await pcReceiver.setRemoteDescription({ type: "offer", sdp: offerSDP });
+    const answer = await pcReceiver.createAnswer();
+    await pcReceiver.setLocalDescription(answer);
+
+    // enviar answer via signaling (broadcast para a sessão; control receberá)
+    if(ws && ws.readyState===1){
+      ws.send(JSON.stringify({ type: "answer", sessionId, answer: pcReceiver.localDescription }));
+      console.log("[PC] answer enviada via WS");
+    } else {
+      console.warn("[PC] WS não disponível para enviar answer");
+    }
+  } catch(err){
+    console.error("[PC] startWebRTCReceive erro", err);
   }
 }
 
