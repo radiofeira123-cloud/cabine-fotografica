@@ -5,66 +5,177 @@
   <title>Cabine - PC</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-    button { margin: 5px; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-    #btnGerarQR { background: #0072ff; color: white; }
-    #btnGerarVisualizador { background: #00a86b; color: white; }
-    #btnFinalizarSessao { background: #ff4444; color: white; }
-    #btnLimparLogs { background: #666; color: white; }
-    button:disabled { background: #ccc !important; cursor: not-allowed; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
     
-    #galeria { display: flex; flex-wrap: wrap; margin-top: 20px; gap: 10px; }
-    .thumb { position: relative; margin: 5px; background: white; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-    .thumb img { width: 200px; height: auto; display:block; border-radius: 3px; }
-    .thumb button { position: absolute; top: 4px; right: 4px; background:rgba(255,255,255,0.9); border:none; padding:4px 8px; cursor:pointer; border-radius: 3px; }
-    #qrContainer { margin-bottom: 20px; padding: 15px; background: white; border-radius: 5px; display: inline-block; }
-    #videoPC { width: 480px; height: 360px; background: #000; display:block; margin-bottom:10px; border-radius: 5px; }
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      padding: 20px; 
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+    }
+    
+    h1 {
+      color: #2c3e50;
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 2.5rem;
+    }
+    
+    .status-panel {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 15px;
+      margin-bottom: 20px;
+      border-left: 5px solid #3498db;
+    }
+    
+    .status-item {
+      display: inline-block;
+      margin-right: 30px;
+      font-weight: bold;
+    }
+    
+    .btn {
+      margin: 5px;
+      padding: 12px 25px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s ease;
+      font-size: 1rem;
+    }
+    
+    .btn-primary { background: #3498db; color: white; }
+    .btn-success { background: #27ae60; color: white; }
+    .btn-danger { background: #e74c3c; color: white; }
+    .btn-secondary { background: #95a5a6; color: white; }
+    
+    .btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+    }
+    
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+    
+    #qrContainer { 
+      margin: 20px 0; 
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+      text-align: center;
+    }
+    
+    #videoPC { 
+      width: 100%;
+      max-width: 640px;
+      height: 360px;
+      background: #000;
+      border-radius: 10px;
+      margin: 10px 0;
+    }
+    
     #logContainer { 
       height: 200px; 
       overflow-y: auto; 
-      border: 1px solid #ccc; 
-      padding: 10px; 
-      margin: 10px 0; 
-      background: #f5f5f5; 
-      font-family: monospace; 
-      font-size: 12px; 
-      border-radius: 5px;
+      border: 1px solid #ddd; 
+      padding: 15px; 
+      margin: 15px 0; 
+      background: #f8f9fa; 
+      font-family: 'Courier New', monospace; 
+      font-size: 14px;
+      border-radius: 8px;
     }
-    .log-entry { margin: 2px 0; }
-    .log-error { color: red; }
-    .log-success { color: green; }
-    .log-warning { color: orange; }
-    .log-info { color: blue; }
     
-    h1 { color: #002250; }
-    .status { background: white; padding: 10px; border-radius: 5px; margin: 10px 0; }
+    .log-entry { margin: 5px 0; padding: 3px; }
+    .log-error { color: #e74c3c; background: #ffeaea; }
+    .log-success { color: #27ae60; background: #eaffea; }
+    .log-warning { color: #f39c12; background: #fff3cd; }
+    .log-info { color: #3498db; }
+    
+    .gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    .photo-card {
+      background: white;
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+      transition: transform 0.3s ease;
+    }
+    
+    .photo-card:hover {
+      transform: translateY(-5px);
+    }
+    
+    .photo-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    
+    .photo-info {
+      padding: 10px 0;
+      font-size: 0.9rem;
+    }
+    
+    .photo-actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
-  <h1>📸 PC Central - Cabine Fotográfica</h1>
-  
-  <div class="status">
-    <strong>Status:</strong> 
-    <span id="statusWS">🔴 Desconectado</span> | 
-    <span id="statusSession">Sessão: Aguardando...</span> | 
-    <span id="statusFotos">Fotos: 0</span>
+  <div class="container">
+    <h1>📸 Cabine Fotográfica - PC Central</h1>
+    
+    <div class="status-panel">
+      <div class="status-item">🔴 <span id="statusWS">Desconectado</span></div>
+      <div class="status-item">📷 <span id="statusSession">Aguardando sessão...</span></div>
+      <div class="status-item">🖼️ <span id="statusFotos">0 fotos</span></div>
+    </div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="btnGerarQR">📱 QR Code Controle</button>
+      <button class="btn btn-success" id="btnGerarVisualizador">🔗 QR Code Visualizador</button>
+      <button class="btn btn-danger" id="btnFinalizarSessao">⏹️ Finalizar Sessão</button>
+      <button class="btn btn-secondary" id="btnLimparLogs">🗑️ Limpar Logs</button>
+    </div>
+
+    <div id="qrContainer"></div>
+    
+    <video id="videoPC" autoplay playsinline muted></video>
+    
+    <div id="logContainer"></div>
+
+    <h3>📷 Galeria de Fotos (<span id="fotoCount">0</span>)</h3>
+    <div class="gallery" id="galeria"></div>
   </div>
-
-  <video id="videoPC" autoplay playsinline muted></video>
-  
-  <div id="qrContainer"></div>
-  
-  <div id="logContainer"></div>
-
-  <div>
-    <button id="btnGerarQR">📱 Gerar QR Code do controle</button>
-    <button id="btnGerarVisualizador">🔗 Gerar QR Code do visualizador</button>
-    <button id="btnFinalizarSessao">⏹️ Finalizar sessão</button>
-    <button id="btnLimparLogs">🗑️ Limpar Logs</button>
-  </div>
-
-  <h3>📷 Galeria de Fotos (<span id="fotoCount">0</span> fotos)</h3>
-  <div id="galeria"></div>
 
   <script src="pc.js"></script>
 </body>
