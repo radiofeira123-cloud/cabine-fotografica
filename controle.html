@@ -245,12 +245,6 @@
       60% { transform: scale(1.12); opacity: 1; }
       100% { transform: scale(1); }
     }
-    
-    @keyframes overlayMove { 
-      0% { transform: translateY(0); }
-      50% { transform: translateY(-20px); }
-      100% { transform: translateY(0); }
-    }
 
     .miniatura.concluida { 
       animation: pop 0.6s ease both;
@@ -258,17 +252,6 @@
 
     h1, .subtitle { 
       animation: floaty 6s ease-in-out infinite;
-    }
-
-    #overlay::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(120deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
-      pointer-events: none;
-      animation: overlayMove 10s linear infinite;
-      mix-blend-mode: overlay;
-      z-index: 2;
     }
 
     /* Mensagem de erro */
@@ -425,34 +408,44 @@
         console.log("[CONTROL]", msg);
     }
 
-    // CORREÇÃO: Função para obter a melhor resolução da câmera
+    // CORREÇÃO: Função para obter resolução 3264x1836
     async function obterMelhorCamera() {
         try {
             const constraints = {
                 video: {
                     facingMode: "user",
-                    width: { ideal: 1920 },
-                    height: { ideal: 1080 },
+                    width: { ideal: 3264, max: 3264 },
+                    height: { ideal: 1836, max: 1836 },
                     aspectRatio: { ideal: 16/9 }
                 },
                 audio: false
             };
             
             const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            logControl("📷 Câmera configurada com alta resolução");
+            logControl("📷 Câmera configurada com alta resolução (3264x1836)");
             return stream;
             
         } catch (error) {
-            logControl("⚠️ Usando resolução padrão: " + error);
-            // Fallback para resolução básica
-            return await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "user" },
-                audio: false
-            });
+            logControl("⚠️ Tentando resolução alternativa: " + error);
+            // Fallback para resolução mais baixa
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: "user",
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    },
+                    audio: false
+                });
+                logControl("✅ Câmera com resolução 1920x1080");
+                return stream;
+            } catch (e) {
+                logControl("❌ Erro câmera: " + e);
+                throw e;
+            }
         }
     }
 
-    // Fluxo de telas cheias
     async function entrarTelaCheia() {
         try {
             logControl("📱 Entrando em tela cheia...");
@@ -484,41 +477,29 @@
         startPhotoFlow();
     }
 
-    // CORREÇÃO: Função para mostrar telas
     function mostrarTela(tela) {
-        // Esconder todas as telas
         document.querySelectorAll('.tela, .tela-transicao').forEach(t => {
             t.style.display = 'none';
             t.classList.remove('ativa');
         });
         
-        // Mostrar apenas a tela desejada
         tela.style.display = 'flex';
         tela.classList.add('ativa');
     }
 
-    // Contagem regressiva SOBRE a câmera
     async function countdownAnimado(segundos) {
         logControl("🔴 INICIANDO CONTAGEM SOBRE CÂMERA");
         
-        // Mostrar apenas a câmera
         videoCam.style.display = "block";
         overlay.style.display = "flex";
         
-        // Configurar overlay
-        overlay.style.position = "fixed";
-        overlay.style.top = "0";
-        overlay.style.left = "0";
-        overlay.style.width = "100%";
-        overlay.style.height = "100%";
-        overlay.style.backgroundColor = "rgba(0,0,0,0.3)";
-        overlay.style.color = "#00ff00";
-        overlay.style.fontSize = "25vw";
-        overlay.style.fontWeight = "bold";
-        overlay.style.alignItems = "center";
-        overlay.style.justifyContent = "center";
-        overlay.style.zIndex = "1000";
-        overlay.style.textShadow = "0 0 20px #00ff00, 0 0 30px #00ff00";
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.3); color: #00ff00; font-size: 25vw;
+            font-weight: bold; display: flex; align-items: center; 
+            justify-content: center; z-index: 1000;
+            text-shadow: 0 0 20px #00ff00, 0 0 30px #00ff00;
+        `;
         
         for (let i = segundos; i >= 1; i--) {
             overlay.textContent = i;
@@ -537,7 +518,6 @@
         overlay.style.display = "none";
     }
 
-    // CORREÇÃO: Fluxo principal com melhor resolução
     async function startPhotoFlow(){
         if(isCounting) return;
         
@@ -545,10 +525,8 @@
         fotoCount = 0;
         fotosCapturadas = [];
 
-        // Carregar moldura
         const molduraImg = await carregarMoldura();
 
-        // CORREÇÃO: Usar função de melhor resolução
         try{
             cameraStream = await obterMelhorCamera();
             videoCam.srcObject = cameraStream;
@@ -562,12 +540,11 @@
             logControl(`✅ Câmera ativada: ${videoCam.videoWidth}x${videoCam.videoHeight}`);
         }catch(e){ 
             logControl("❌ Erro câmera: "+e); 
-            mostrarErro("❌ Erro na câmera");
+            mostrarErro("❌ Erro na câmera\nRecarregue a página");
             isCounting = false;
             return; 
         }
 
-        // TIRAR AS 3 FOTOS
         while(fotoCount < maxFotos && isCounting){
             logControl(`📸 Foto ${fotoCount + 1} de ${maxFotos}`);
             
@@ -576,7 +553,6 @@
             
             await countdownAnimado(3);
             
-            // CORREÇÃO: Capturar com alta qualidade
             const blob = await captureFramedPhoto(videoCam, molduraImg);
             if (!blob) {
                 logControl("❌ Erro ao capturar foto");
@@ -615,10 +591,8 @@
         isCounting = false;
     }
 
-    // CORREÇÃO: Captura em alta resolução
     function captureFramedPhoto(videoEl, molduraImg){
         return new Promise(resolve => {
-            // Usar a resolução REAL do vídeo
             const w = videoEl.videoWidth;
             const h = videoEl.videoHeight;
             
@@ -628,22 +602,19 @@
             canvasHidden.height = h;
             const ctx = canvasHidden.getContext("2d", { willReadFrequently: true });
             
-            // Desenhar vídeo (espelhado)
             ctx.translate(w, 0);
             ctx.scale(-1, 1);
             ctx.drawImage(videoEl, 0, 0, w, h);
             ctx.setTransform(1, 0, 0, 1, 0, 0);
             
-            // Aplicar moldura
             if (molduraCarregada && molduraImg) {
                 ctx.drawImage(molduraImg, 0, 0, w, h);
             }
             
-            // CORREÇÃO: Qualidade máxima
             canvasHidden.toBlob(blob => {
                 logControl(`✅ Foto capturada: ${(blob.size/1024/1024).toFixed(2)}MB`);
                 resolve(blob);
-            }, "image/jpeg", 0.95); // 95% de qualidade
+            }, "image/jpeg", 0.92);
         });
     }
 
@@ -674,17 +645,14 @@
         overlay.style.justifyContent = "center";
     }
 
-    // CORREÇÃO: Reset melhorado
     async function resetToIntro(){
         logControl("🔄 Resetando para início...");
         
-        isCounting = false; // IMPORTANTE: Parar o loop de fotos
+        isCounting = false;
         
-        // Parar câmera corretamente
         if(cameraStream) {
             cameraStream.getTracks().forEach(track => {
                 track.stop();
-                cameraStream.removeTrack(track);
             });
             cameraStream = null;
         }
@@ -699,14 +667,11 @@
         const previewImg = document.getElementById("__previewImg");
         if(previewImg) previewImg.style.display = "none";
         
-        // Resetar variáveis
         fotoCount = 0;
         fotosCapturadas = [];
         
-        // Mostrar tela inicial
         mostrarTela(telaInicial);
         
-        // CORREÇÃO: Reativar botão
         const btnInicial = document.querySelector('#telaInicial .btn-principal');
         if (btnInicial) {
             btnInicial.disabled = false;
@@ -724,7 +689,6 @@
         }
     }
 
-    // Preview das fotos
     function showPreview(dataURL){
         videoCam.style.display = "none";
         overlay.style.display = "none";
@@ -753,7 +717,6 @@
         videoCam.style.display = "block";
     }
 
-    // Utilitários
     function blobToDataURL(blob){
         return new Promise(res => { 
             const fr = new FileReader(); 
@@ -766,7 +729,6 @@
         return new Promise(r => setTimeout(r, ms)); 
     }
 
-    // Inicializar
     window.addEventListener('load', () => {
         logControl("🚀 Sistema carregado");
         connectWS();
