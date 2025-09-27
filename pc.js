@@ -18,6 +18,10 @@ const btnGerarQR = document.getElementById("btnGerarQR");
 const btnGerarVisualizador = document.getElementById("btnGerarVisualizador");
 const btnFinalizarSessao = document.getElementById("btnFinalizarSessao");
 const btnLimparLogs = document.getElementById("btnLimparLogs");
+const statusWS = document.getElementById("statusWS");
+const statusSession = document.getElementById("statusSession");
+const statusFotos = document.getElementById("statusFotos");
+const fotoCount = document.getElementById("fotoCount");
 
 // WebRTC
 let pcReceiver = null;
@@ -32,6 +36,16 @@ function logPC(msg, type = "info") {
     logContainer.appendChild(logEntry);
     logContainer.scrollTop = logContainer.scrollHeight;
     console.log(`[PC][${type.toUpperCase()}]`, msg);
+    
+    // Atualizar status
+    updateStatus();
+}
+
+function updateStatus() {
+    statusWS.textContent = ws && ws.readyState === WebSocket.OPEN ? "🟢 Conectado" : "🔴 Desconectado";
+    statusSession.textContent = sessionId ? `Sessão: ${sessionId}` : "Sessão: Aguardando...";
+    statusFotos.textContent = `Fotos: ${fotos.length}`;
+    fotoCount.textContent = fotos.length;
 }
 
 /* ------------- WebSocket com Reconexão Inteligente ------------- */
@@ -55,6 +69,7 @@ function connectWS() {
             logPC("✅ WebSocket conectado com sucesso", "success");
             reconnectAttempts = 0;
             ws.send(JSON.stringify({ type: "register", role: "pc" }));
+            updateStatus();
         };
         
         ws.onmessage = (ev) => {
@@ -68,6 +83,7 @@ function connectWS() {
         
         ws.onclose = (event) => {
             logPC(`🔌 WebSocket fechado. Código: ${event.code}`, "warning");
+            updateStatus();
             
             if (event.code !== 1000) {
                 scheduleReconnect();
@@ -76,6 +92,7 @@ function connectWS() {
         
         ws.onerror = (error) => {
             logPC("❌ Erro no WebSocket", "error");
+            updateStatus();
         };
         
     } catch (error) {
@@ -98,6 +115,7 @@ function disconnectWS() {
     if (ws) {
         ws.close(1000, "Desconexão solicitada pelo usuário");
         ws = null;
+        updateStatus();
     }
 }
 
@@ -122,6 +140,7 @@ function handleMessage(msg) {
             
         case "control-fullscreen":
             clearQR();
+            logPC("📱 Controle entrou em tela cheia", "success");
             break;
             
         case "end-session":
@@ -161,6 +180,16 @@ function genControlQR() {
             colorLight: "#ffffff",
             correctLevel: QRCode.CorrectLevel.H
         });
+        
+        const link = document.createElement("a");
+        link.href = controlUrl;
+        link.target = "_blank";
+        link.textContent = "Abrir Controle";
+        link.style.display = "block";
+        link.style.marginTop = "10px";
+        link.style.textAlign = "center";
+        qrContainer.appendChild(link);
+        
         logPC(`📱 QR Code do controle gerado: ${controlUrl}`, "success");
     } catch (error) {
         logPC("❌ Erro ao gerar QR Code: " + error, "error");
@@ -178,11 +207,6 @@ function addPhotoLocal(filename, dataURL) {
 
 function renderGallery() {
     galeria.innerHTML = "";
-    
-    const galleryTitle = document.querySelector("h3");
-    if (galleryTitle) {
-        galleryTitle.textContent = `Galeria de Fotos (${fotos.length} foto${fotos.length !== 1 ? 's' : ''})`;
-    }
     
     fotos.forEach((f, idx) => {
         const div = document.createElement("div");
@@ -239,19 +263,12 @@ function amplifyPhoto(dataURL) {
     logPC("🔍 Foto ampliada", "info");
 }
 
-/* ------------- Finalizar Sessão e Upload ------------- */
-async function finalizarSessao() {
+/* ------------- Upload para ImgBB ------------- */
+async function uploadParaImgBB() {
     if (fotos.length === 0) {
-        alert("📭 Nenhuma foto na sessão para finalizar.");
-        return;
+        alert("📭 Nenhuma foto para enviar.");
+        return [];
     }
-    
-    if (!confirm(`Deseja finalizar a sessão? ${fotos.length} foto${fotos.length !== 1 ? 's' : ''} serão enviadas para o ImgBB.`)) {
-        return;
-    }
-    
-    btnFinalizarSessao.disabled = true;
-    btnFinalizarSessao.textContent = "Enviando...";
     
     logPC(`🔄 Iniciando upload de ${fotos.length} foto${fotos.length !== 1 ? 's' : ''} para o ImgBB...`, "info");
     
@@ -259,6 +276,13 @@ async function finalizarSessao() {
     
     for (const [index, f] of fotos.entries()) {
         try {
+            // Se já tem URL do ImgBB, usa ela
+            if (f.imgbbUrl) {
+                uploaded.push(f.imgbbUrl);
+                logPC(`✅ Foto ${index + 1} já enviada anteriormente: ${f.imgbbUrl}`, "success");
+                continue;
+            }
+            
             logPC(`📤 Enviando foto ${index + 1}/${fotos.length}: ${f.filename}`, "info");
             
             const base64 = f.dataURL.split(",")[1];
@@ -285,7 +309,6 @@ async function finalizarSessao() {
                 throw new Error("Resposta inválida do ImgBB");
             }
             
-            // Pequena pausa entre uploads
             if (index < fotos.length - 1) {
                 await new Promise(resolve => setTimeout(resolve, 500));
             }
@@ -295,47 +318,34 @@ async function finalizarSessao() {
         }
     }
     
-    if (uploaded.length > 0) {
-        generateVisualizerQR(uploaded);
-        
-        // ⚠️ CORREÇÃO IMPORTANTE: ENVIAR COMANDO PARA CELULAR VOLTAR AO INÍCIO
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ 
-                type: "end-session", 
-                sessionId 
-            }));
-            logPC("📵 Comando 'end-session' enviado para o celular", "success");
-        }
-        
-    } else {
-        logPC("❌ Nenhuma foto foi enviada com sucesso", "error");
-        alert("Erro: Nenhuma foto foi enviada. Verifique os logs.");
-    }
-    
-    btnFinalizarSessao.disabled = false;
-    btnFinalizarSessao.textContent = "Finalizar sessão";
+    return uploaded;
 }
 
-/* ------------- Gerar QR do visualizador (compatível com dataURL e imgbbUrl) ------------- */
-function generateVisualizerQR(uploadedUrls) {
-    // Se função foi chamada com lista (do upload) use ela
-    let urls = [];
-    if (Array.isArray(uploadedUrls) && uploadedUrls.length > 0) {
-        urls = uploadedUrls;
-    } else {
-        // Caso contrário, montar a lista a partir do array fotos (imgbbUrl se existir ou dataURL)
-        urls = fotos.map(f => f.imgbbUrl || f.dataURL);
-    }
-    
-    if (!urls || urls.length === 0) {
+/* ------------- Gerar QR do Visualizador ------------- */
+async function generateVisualizerQR() {
+    if (fotos.length === 0) {
         alert("📭 Nenhuma foto disponível para gerar o visualizador.");
         return;
     }
 
+    btnGerarVisualizador.disabled = true;
+    btnGerarVisualizador.textContent = "Enviando...";
+
+    // Fazer upload primeiro
+    const uploaded = await uploadParaImgBB();
+
+    if (uploaded.length === 0) {
+        alert("❌ Nenhuma foto foi enviada com sucesso.");
+        btnGerarVisualizador.disabled = false;
+        btnGerarVisualizador.textContent = "🔗 Gerar QR Code do visualizador";
+        return;
+    }
+
+    // Gerar QR do visualizador
     const sessionObj = { 
-        images: urls, 
+        images: uploaded, 
         createdAt: new Date().toISOString(),
-        photoCount: urls.length
+        photoCount: uploaded.length
     };
     
     const enc = btoa(unescape(encodeURIComponent(JSON.stringify(sessionObj))));
@@ -344,8 +354,7 @@ function generateVisualizerQR(uploadedUrls) {
     clearQR();
     
     try {
-        // Tenta criar o QR; se o QRCode lib não estiver carregado, cria apenas o link
-        if (typeof QRCode !== "undefined" && QRCode) {
+        if (typeof QRCode !== "undefined") {
             new QRCode(qrContainer, { 
                 text: visualUrl, 
                 width: 220, 
@@ -354,16 +363,8 @@ function generateVisualizerQR(uploadedUrls) {
                 colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
-        } else {
-            // fallback: mostrar link
-            const fallback = document.createElement("div");
-            fallback.textContent = visualUrl;
-            qrContainer.appendChild(fallback);
         }
         
-        logPC(`📊 QR do visualizador gerado: ${visualUrl}`, "success");
-        
-        // Adicionar link abaixo do QR
         const link = document.createElement("a");
         link.href = visualUrl;
         link.target = "_blank";
@@ -373,14 +374,42 @@ function generateVisualizerQR(uploadedUrls) {
         link.style.textAlign = "center";
         qrContainer.appendChild(link);
         
+        logPC(`📊 QR do visualizador gerado: ${visualUrl}`, "success");
+        alert(`✅ QR do visualizador gerado para ${uploaded.length} foto${uploaded.length !== 1 ? 's' : ''}!`);
+        
     } catch (error) {
         logPC("❌ Erro ao gerar QR do visualizador: " + error, "error");
     }
     
-    // NÃO limpar fotos aqui — manter para que o operador consiga finalizar sessão manualmente
-    // (o reset acontece somente em resetSession / finalizarSessao)
+    btnGerarVisualizador.disabled = false;
+    btnGerarVisualizador.textContent = "🔗 Gerar QR Code do visualizador";
+}
+
+/* ------------- Finalizar Sessão ------------- */
+async function finalizarSessao() {
+    if (fotos.length === 0) {
+        alert("📭 Nenhuma foto na sessão.");
+        return;
+    }
     
-    alert(`✅ QR do visualizador gerado para ${urls.length} foto${urls.length !== 1 ? 's' : ''}.`);
+    if (!confirm("Deseja realmente finalizar a sessão? O celular voltará ao início.")) {
+        return;
+    }
+    
+    // Enviar comando para celular voltar ao início
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ 
+            type: "end-session", 
+            sessionId 
+        }));
+        logPC("📵 Comando 'end-session' enviado para o celular", "success");
+    }
+    
+    // Limpar interface do PC
+    resetSession();
+    clearQR();
+    
+    alert("Sessão finalizada com sucesso!");
 }
 
 function resetSession() {
@@ -448,18 +477,19 @@ function updateUI() {
     btnFinalizarSessao.disabled = !hasSession;
     btnGerarVisualizador.disabled = !hasPhotos;
     
-    // Atualizar texto do botão finalizar
     if (hasPhotos) {
-        btnFinalizarSessao.textContent = `Finalizar sessão (${fotos.length} foto${fotos.length !== 1 ? 's' : ''})`;
+        btnFinalizarSessao.textContent = `⏹️ Finalizar sessão (${fotos.length} foto${fotos.length !== 1 ? 's' : ''})`;
     } else {
-        btnFinalizarSessao.textContent = "Finalizar sessão";
+        btnFinalizarSessao.textContent = "⏹️ Finalizar sessão";
     }
+    
+    updateStatus();
 }
 
 /* ------------- Event Listeners ------------- */
 btnGerarQR.onclick = genControlQR;
+btnGerarVisualizador.onclick = generateVisualizerQR;
 btnFinalizarSessao.onclick = finalizarSessao;
-btnGerarVisualizador.onclick = () => generateVisualizerQR();
 btnLimparLogs.onclick = () => {
     logContainer.innerHTML = "";
     logPC("📋 Logs limpos", "info");
@@ -478,7 +508,5 @@ document.addEventListener("DOMContentLoaded", () => {
     logPC("🚀 PC Central inicializado", "success");
     connectWS();
     updateUI();
-
-    // Garantir que galeria seja renderizada inicialmente
-    try{ renderGallery(); }catch(e){}
+    renderGallery();
 });
