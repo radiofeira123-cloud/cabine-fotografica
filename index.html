@@ -3,27 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <title>Cabine - PC</title>
-  <!-- Biblioteca QRCode.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; }
     button { margin: 5px; padding: 10px; }
     #galeria { display: flex; flex-wrap: wrap; margin-top: 20px; }
-    #galeria div { position: relative; margin: 5px; }
-    #galeria img { width: 200px; }
-    #galeria button { position: absolute; top: 0; right: 0; }
+    .thumb { position: relative; margin: 5px; }
+    .thumb img { width: 200px; height: auto; display:block; }
+    .thumb button { position: absolute; top: 4px; right: 4px; background:rgba(255,255,255,0.9); border:none; padding:4px 8px; cursor:pointer; }
     #qrContainer { margin-bottom: 20px; }
+    #videoPC { width: 480px; height: 360px; background: #000; display:block; margin-bottom:10px; }
   </style>
 </head>
 <body>
   <h1>PC Central</h1>
 
+  <video id="videoPC" autoplay playsinline muted></video>
   <div id="qrContainer"></div>
 
-  <button id="btnGerarQR">Gerar QR Code do controle</button>
-  <button id="btnIniciar">Iniciar sessão</button>
-  <button id="btnFinalizar">Finalizar sessão</button>
+  <div>
+    <button id="btnGerarQR">Gerar QR Code do controle</button>
+    <button id="btnGerarVisualizador" disabled>Gerar QR Code do visualizador</button>
+    <button id="btnFinalizarSessao">Finalizar sessão</button>
+  </div>
 
+  <h3>Galeria</h3>
   <div id="galeria"></div>
 
   <script src="pc.js"></script>
