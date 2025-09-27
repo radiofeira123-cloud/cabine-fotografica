@@ -1,8 +1,8 @@
 // controle.js - celular da cabine
 const WS_URL = "wss://chatcabinerender.onrender.com";
-// USAR URL ABSOLUTA PARA O VÍDEO - MUDAR CONFORME SUA HOSPEDAGEM
-const MOLDURA_PATH = "https://seusite.com/assets/moldura.png";
-const VIDEO_PATH = "https://seusite.com/assets/video-instrucoes.mp4";
+
+// URLs serão definidas automaticamente pela URL do deploy
+let MOLDURA_PATH, VIDEO_PATH;
 
 let ws;
 let sessionId = null;
@@ -20,23 +20,61 @@ const overlay = document.getElementById("overlay");
 const tapBtn = document.getElementById("tapBtn");
 const canvasHidden = document.getElementById("canvasHidden");
 
-// Configurar vídeo com fallback
-videoInstr.src = VIDEO_PATH;
-videoInstr.loop = true;
-videoInstr.muted = true;
-videoInstr.playsInline = true;
+// Configurar URLs baseadas na URL atual
+function setupPaths() {
+    const baseUrl = window.location.origin;
+    MOLDURA_PATH = `${baseUrl}/assets/moldura.png`;
+    VIDEO_PATH = `${baseUrl}/assets/video-instrucoes.mp4`;
+    logControl(`🔗 URLs configuradas: ${baseUrl}`);
+}
 
-videoInstr.addEventListener('loadeddata', () => {
-    logControl("Vídeo de instruções carregado");
-    videoInstr.play().catch(e => logControl("Erro play vídeo: " + e));
-});
+// Configuração robusta do vídeo
+function setupVideo() {
+    setupPaths(); // Configurar URLs
+    
+    videoInstr.src = VIDEO_PATH;
+    videoInstr.loop = true;
+    videoInstr.muted = true;
+    videoInstr.playsInline = true;
+    videoInstr.preload = "auto";
+    
+    videoInstr.addEventListener('loadeddata', () => {
+        logControl("✅ Vídeo carregado, tentando reproduzir...");
+        playVideoWithFallback();
+    });
+    
+    videoInstr.addEventListener('error', (e) => {
+        logControl("❌ Erro no vídeo, usando fallback");
+        showVideoFallback();
+    });
+    
+    videoInstr.load();
+}
 
-videoInstr.addEventListener('error', (e) => {
-    logControl("❌ Erro no vídeo, usando fallback: " + e);
-    // Fallback: mostrar imagem estática ou mensagem
-    overlay.innerText = "📸 Cabine Fotográfica\nToque para começar";
+// Tentar reproduzir com fallback
+async function playVideoWithFallback() {
+    try {
+        await videoInstr.play();
+        logControl("🎥 Vídeo em reprodução");
+        overlay.style.display = "none";
+    } catch (error) {
+        logControl("❌ Autoplay bloqueado, mostrando fallback");
+        showVideoFallback();
+    }
+}
+
+// Fallback se o vídeo falhar
+function showVideoFallback() {
+    overlay.innerText = "📸 Cabine Fotográfica\n🔴 Toque para começar";
+    overlay.style.backgroundColor = "rgba(0,0,0,0.8)";
+    overlay.style.color = "white";
+    overlay.style.fontSize = "8vw";
     overlay.style.display = "flex";
-});
+    overlay.style.flexDirection = "column";
+    overlay.style.justifyContent = "center";
+    overlay.style.alignItems = "center";
+    overlay.style.textAlign = "center";
+}
 
 function connectWS(){
     if(ws && ws.readyState === WebSocket.OPEN) return;
@@ -58,7 +96,6 @@ function connectWS(){
     };
     ws.onerror = (e)=> logControl("WS error: "+e);
 }
-connectWS();
 
 function logControl(msg){
     console.log("[CONTROL]", msg);
@@ -79,7 +116,6 @@ async function enterFullscreen(){
         logControl("✅ Entrou em fullscreen");
     }catch(e){ 
         logControl("❌ FS fail: "+e); 
-        // Continuar mesmo sem fullscreen
         startPhotoFlow();
     }
 }
@@ -98,201 +134,140 @@ async function resetToIntro(){
         } 
     }catch(e){ logControl("Stop cam fail: "+e);}
     
-    // MOSTRAR VÍDEO DE INSTRUÇÕES NOVAMENTE
     videoInstr.style.display = "block";
     videoCam.style.display = "none";
     overlay.innerText = "";
     overlay.style.backgroundColor = "transparent";
-    overlay.style.fontSize = "6vw";
     fotoCount = 0;
     isCounting = false;
     
-    // Tentar reproduzir o vídeo novamente
     videoInstr.currentTime = 0;
-    videoInstr.play().catch(e => logControl("Erro replay vídeo: " + e));
+    playVideoWithFallback();
     
-    // Sair do fullscreen se estiver
     if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
-    
-    // Mostrar botão novamente
     tapBtn.style.display = "block";
-    logControl("🔄 Voltou ao vídeo inicial");
+    logControl("🔄 Voltou ao início");
 }
 
 async function startPhotoFlow(){
-    if(isCounting || fotoCount >= maxFotos){
-        logControl("Ignorando clique: contagem em andamento ou limite atingido");
-        return;
-    }
+    if(isCounting || fotoCount>=maxFotos) return;
     
-    isCounting = true;
-    logControl("📸 Iniciando fluxo de fotos - Foto " + (fotoCount + 1));
-    
-    // ESCONDER VÍDEO DE INSTRUÇÕES
-    videoInstr.style.display = "none";
-    videoCam.style.display = "block";
+    isCounting=true;
+    videoInstr.style.display="none";
+    videoCam.style.display="block";
 
     try{
         const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: "user", 
-                width: { ideal: 1920 }, 
-                height: { ideal: 1080 } 
-            }, 
-            audio: false 
+            video: { facingMode:"user", width:{ideal:1920}, height:{ideal:1080} }, 
+            audio:false 
         });
         videoCam.srcObject = stream;
         await videoCam.play();
-        logControl("✅ Câmera ativada");
     }catch(e){ 
-        logControl("❌ Erro câmera: "+e); 
-        // Fallback: mostrar mensagem de erro
-        overlay.innerText = "❌ Erro na câmera\nRecarregue a página";
-        overlay.style.display = "flex";
+        logControl("Erro câmera: "+e); 
         isCounting = false;
         return; 
     }
 
     const mold = new Image();
-    mold.crossOrigin = "anonymous";
-    mold.src = MOLDURA_PATH;
+    mold.crossOrigin="anonymous";
+    mold.src=MOLDURA_PATH;
 
-    await showOverlayText("📸 Prepare-se para tirar suas fotos", 1500);
+    await showOverlayText("Prepare-se para tirar suas fotos",1500);
 
-    // TIRAR FOTOS SEQUENCIAIS
-    while(fotoCount < maxFotos){
+    while(fotoCount<maxFotos){
         await countdownOverlay(3);
-        
-        // CAPTURAR FOTO
         const blob = await captureFramedPhoto(videoCam, mold);
         const dataURL = await blobToDataURL(blob);
-        
-        // MOSTRAR PREVIEW POR 3 SEGUNDOS APENAS
         showPreview(dataURL);
         
-        // ENVIAR PARA O PC
-        if(ws && ws.readyState === 1){
+        if(ws && ws.readyState===1){
             ws.send(JSON.stringify({ 
-                type: "photo", 
+                type:"photo", 
                 sessionId, 
-                filename: `photo_${Date.now()}_${fotoCount+1}.jpg`, 
-                data: dataURL 
+                filename:`photo_${Date.now()}_${fotoCount+1}.jpg`, 
+                data:dataURL 
             }));
         }
         
         fotoCount++;
-        logControl(`✅ Foto ${fotoCount}/${maxFotos} capturada`);
         
-        // AGUARDAR 3 SEGUNDOS MOSTRANDO A FOTO
-        await sleep(3000);
-        
-        // ESCONDER PREVIEW E VOLTAR PARA CÂMERA
-        hidePreview();
-        
-        // SE NÃO FOR A ÚLTIMA FOTO, PREPARAR PRÓXIMA
         if(fotoCount < maxFotos){
-            await showOverlayText("📸 Prepare-se para a próxima foto", 1000);
+            await sleep(3000);
+            hidePreview();
+            await showOverlayText("Prepare-se para a próxima foto",1000);
         }
     }
     
-    // ⚠️ CORREÇÃO: APÓS A ÚLTIMA FOTO, MOSTRAR MENSAGEM DE SUCESSO
-    // E DEPOIS VOLTAR AO INÍCIO - NÃO TRAVAR NA FOTO
+    // ⚠️ CORREÇÃO: Fluxo final correto
+    overlay.innerText="✅ Sucesso! Obrigado por utilizar a cabine fotográfica 😃";
+    overlay.style.backgroundColor="rgba(0,0,0,0.9)";
+    overlay.style.color="white";
+    overlay.style.fontSize="6vw";
+    overlay.style.display="flex";
     
-    logControl("🎉 Todas as fotos concluídas!");
-    
-    // 1. Mostrar mensagem de sucesso por 5 segundos
-    overlay.innerText = "✅ Sucesso!\nObrigado por utilizar a cabine fotográfica 😃";
-    overlay.style.backgroundColor = "rgba(0,0,0,0.9)";
-    overlay.style.color = "white";
-    overlay.style.fontSize = "6vw";
-    overlay.style.display = "flex";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-    overlay.style.height = "100%";
-    
-    // 2. Aguardar 5 segundos com a mensagem
-    await sleep(5000);
-    
-    // 3. VOLTAR AO VÍDEO INICIAL (não travar na última foto)
-    resetToIntro();
-    
-    isCounting = false;
+    await sleep(5000); // Mostrar mensagem por 5s
+    resetToIntro(); // Voltar ao início
+    isCounting=false;
 }
 
 function captureFramedPhoto(videoEl, moldImage){
-    return new Promise(resolve => {
-        const w = videoEl.videoWidth || 1280;
-        const h = videoEl.videoHeight || 720;
-        canvasHidden.width = w;
-        canvasHidden.height = h;
+    return new Promise(resolve=>{
+        const w=videoEl.videoWidth||1280;
+        const h=videoEl.videoHeight||720;
+        canvasHidden.width=w;
+        canvasHidden.height=h;
         const ctx = canvasHidden.getContext("2d");
-        
-        // Desenhar frame da câmera
-        ctx.drawImage(videoEl, 0, 0, w, h);
-        
-        // Aplicar moldura se carregada
-        const applyMoldura = () => {
-            if(moldImage.complete && moldImage.naturalWidth > 0){
-                ctx.drawImage(moldImage, 0, 0, w, h);
-            }
-            canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
-        };
-        
+        ctx.drawImage(videoEl,0,0,w,h);
         if(moldImage.complete){
-            applyMoldura();
-        } else {
-            moldImage.onload = applyMoldura;
-            moldImage.onerror = () => {
-                logControl("⚠️ Moldura não carregada, foto sem moldura");
-                canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
+            ctx.drawImage(moldImage,0,0,w,h);
+            canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95);
+        }else{
+            moldImage.onload=()=>{ 
+                ctx.drawImage(moldImage,0,0,w,h); 
+                canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95); 
             };
-            
-            // Timeout para não travar se a moldura não carregar
-            setTimeout(applyMoldura, 1000);
         }
     });
 }
 
 function blobToDataURL(blob){
-    return new Promise(res => { 
-        const fr = new FileReader(); 
-        fr.onload = () => res(fr.result); 
+    return new Promise(res=>{ 
+        const fr=new FileReader(); 
+        fr.onload=()=>res(fr.result); 
         fr.readAsDataURL(blob); 
     });
 }
 
 function showPreview(dataURL){
-    let img = document.getElementById("__previewImg");
+    let img=document.getElementById("__previewImg");
     if(!img){
-        img = document.createElement("img");
-        img.id = "__previewImg";
-        img.style.position = "absolute";
-        img.style.top = "0";
-        img.style.left = "0";
-        img.style.width = "100%";
-        img.style.height = "100%";
-        img.style.objectFit = "contain";
-        img.style.zIndex = 9998;
-        img.style.backgroundColor = "#000";
+        img=document.createElement("img");
+        img.id="__previewImg";
+        img.style.position="absolute";
+        img.style.top="0";
+        img.style.left="0";
+        img.style.width="100%";
+        img.style.height="100%";
+        img.style.objectFit="contain";
+        img.style.zIndex=9998;
         document.body.appendChild(img);
     }
-    img.src = dataURL;
-    img.style.display = "block";
-    videoCam.style.display = "none";
+    img.src=dataURL;
+    img.style.display="block";
+    videoCam.style.display="none";
 }
 
 function hidePreview(){
-    const img = document.getElementById("__previewImg");
-    if(img) img.style.display = "none";
-    videoCam.style.display = "block";
+    const img=document.getElementById("__previewImg");
+    if(img) img.style.display="none";
+    videoCam.style.display="block";
 }
 
-function showOverlayText(text, ms){
-    overlay.innerText = text;
-    overlay.style.display = "flex";
-    return sleep(ms).then(() => { 
-        overlay.innerText = "";
-    });
+function showOverlayText(text,ms){
+    overlay.innerText=text;
+    overlay.style.display="flex";
+    return sleep(ms).then(()=> overlay.innerText="");
 }
 
 function countdownOverlay(sec){
@@ -310,7 +285,6 @@ function countdownOverlay(sec){
         overlayCount.style.zIndex = 9999;
         overlayCount.style.pointerEvents = "none";
         overlayCount.style.backgroundColor = "rgba(0,0,0,0.7)";
-        overlayCount.style.color = "white";
         document.body.appendChild(overlayCount);
         
         let count = sec;
@@ -329,17 +303,11 @@ function countdownOverlay(sec){
     });
 }
 
-function sleep(ms){ 
-    return new Promise(r => setTimeout(r, ms)); 
-}
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
-// Fallback: tentar reproduzir vídeo quando a página carregar
+// Inicializar
 window.addEventListener('load', () => {
-    setTimeout(() => {
-        videoInstr.play().catch(e => {
-            logControl("Autoplay bloqueado, mostrando fallback");
-            overlay.innerText = "📸 Cabine Fotográfica\nToque para começar";
-            overlay.style.display = "flex";
-        });
-    }, 1000);
+    logControl("🚀 Página carregada");
+    setupVideo();
+    connectWS();
 });
