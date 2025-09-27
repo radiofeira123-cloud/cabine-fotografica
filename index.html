@@ -173,6 +173,13 @@
       gap: 10px;
       margin: 20px 0;
     }
+    
+    .empty-state {
+      text-align: center;
+      padding: 40px;
+      color: #7f8c8d;
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
@@ -205,7 +212,7 @@
   </div>
 
   <script>
-    // pc.js - CORRIGIDO (botões não travam após reset)
+    // pc.js - CORRIGIDO (finalizar não reenvia, limpa tela)
     const WS_URL = "wss://chatcabinerender.onrender.com";
     const IMGBB_API_KEY = "6734e028b20f88d5795128d242f85582";
 
@@ -229,9 +236,6 @@
     const statusSession = document.getElementById("statusSession");
     const statusFotos = document.getElementById("statusFotos");
     const fotoCount = document.getElementById("fotoCount");
-
-    // WebRTC
-    let pcReceiver = null;
 
     function logPC(msg, type = "info") {
         const timestamp = new Date().toLocaleTimeString();
@@ -473,15 +477,17 @@
         btnGerarVisualizador.textContent = "📤 Enviando...";
 
         const uploaded = [];
+        const fotosParaEnviar = fotos.filter(f => !f.imgbbUrl);
         
-        for (const [index, f] of fotos.entries()) {
+        if (fotosParaEnviar.length === 0) {
+            logPC("✅ Todas as fotos já foram enviadas anteriormente", "success");
+        } else {
+            logPC(`📤 Enviando ${fotosParaEnviar.length} foto${fotosParaEnviar.length !== 1 ? 's' : ''} para o ImgBB...`, "info");
+        }
+
+        for (const [index, f] of fotosParaEnviar.entries()) {
             try {
-                if (f.imgbbUrl) {
-                    uploaded.push(f.imgbbUrl);
-                    continue;
-                }
-                
-                logPC(`📤 Enviando foto ${index + 1}/${fotos.length}`, "info");
+                logPC(`Enviando foto ${index + 1}/${fotosParaEnviar.length}`, "info");
                 
                 const base64 = f.dataURL.split(",")[1];
                 const form = new FormData();
@@ -503,18 +509,21 @@
                     logPC(`✅ Foto ${index + 1} enviada`, "success");
                 }
                 
-                if (index < fotos.length - 1) await new Promise(r => setTimeout(r, 500));
+                if (index < fotosParaEnviar.length - 1) await new Promise(r => setTimeout(r, 500));
                 
             } catch (error) {
                 logPC(`❌ Erro foto ${index + 1}: ${error.message}`, "error");
             }
         }
+
+        // Usar URLs existentes + novas URLs
+        const todasUrls = fotos.map(f => f.imgbbUrl).filter(url => url);
         
-        if (uploaded.length > 0) {
+        if (todasUrls.length > 0) {
             const sessionObj = { 
-                images: uploaded, 
+                images: todasUrls, 
                 createdAt: new Date().toISOString(),
-                photoCount: uploaded.length
+                photoCount: todasUrls.length
             };
             
             const enc = btoa(unescape(encodeURIComponent(JSON.stringify(sessionObj))));
@@ -545,11 +554,11 @@
             link.style.textDecoration = "none";
             qrContainer.appendChild(link);
             
-            logPC(`📊 QR do visualizador gerado`, "success");
-            alert(`✅ ${uploaded.length} foto${uploaded.length !== 1 ? 's' : ''} processadas!`);
+            logPC(`📊 QR do visualizador gerado (${todasUrls.length} fotos)`, "success");
+            alert(`✅ ${todasUrls.length} foto${todasUrls.length !== 1 ? 's' : ''} processadas!`);
             
         } else {
-            alert("❌ Nenhuma foto foi enviada.");
+            alert("❌ Nenhuma foto foi enviada com sucesso.");
         }
         
         btnGerarVisualizador.disabled = false;
@@ -563,25 +572,23 @@
             return;
         }
         
-        if (!confirm(`Finalizar sessão? ${fotos.length} foto${fotos.length !== 1 ? 's' : ''} serão enviadas.`)) {
+        if (!confirm(`Deseja finalizar a sessão? O celular voltará ao início.`)) {
             return;
         }
         
-        // CORREÇÃO: Primeiro enviar para ImgBB, depois finalizar
-        await generateVisualizerQR();
-        
-        // Enviar comando para celular
+        // CORREÇÃO: Apenas enviar comando para celular, NÃO reenviar fotos
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ 
                 type: "end-session", 
                 sessionId 
             }));
-            logPC("📵 Comando 'end-session' enviado", "success");
+            logPC("📵 Comando 'end-session' enviado para o celular", "success");
         }
         
-        // CORREÇÃO: Não limpar fotos automaticamente
-        // O usuário decide quando limpar manualmente
-        alert("Sessão finalizada com sucesso!");
+        // CORREÇÃO: Limpar QR code e manter fotos
+        clearQR();
+        
+        alert("✅ Sessão finalizada! O celular voltou ao início.");
         updateUI();
     }
 
@@ -590,7 +597,6 @@
         const hasPhotos = fotos.length > 0;
         const isConnected = ws && ws.readyState === WebSocket.OPEN;
         
-        // CORREÇÃO: Botões sempre habilitados quando apropriado
         btnGerarQR.disabled = !hasSession || !isConnected;
         btnGerarVisualizador.disabled = !hasPhotos;
         btnFinalizarSessao.disabled = !hasSession || !hasPhotos || !isConnected;
@@ -615,7 +621,6 @@
 
     window.addEventListener("beforeunload", () => {
         if (ws) ws.close(1000, "Fechando página");
-        if (pcReceiver) pcReceiver.close();
     });
 
     // Inicialização
