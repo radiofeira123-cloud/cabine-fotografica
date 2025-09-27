@@ -13,21 +13,39 @@
     .thumb button { position: absolute; top: 4px; right: 4px; background:rgba(255,255,255,0.9); border:none; padding:4px 8px; cursor:pointer; }
     #qrContainer { margin-bottom: 20px; }
     #videoPC { width: 480px; height: 360px; background: #000; display:block; margin-bottom:10px; }
+    #logContainer { 
+      height: 200px; 
+      overflow-y: auto; 
+      border: 1px solid #ccc; 
+      padding: 10px; 
+      margin: 10px 0; 
+      background: #f5f5f5; 
+      font-family: monospace; 
+      font-size: 12px; 
+    }
+    .log-entry { margin: 2px 0; }
+    .log-error { color: red; }
+    .log-success { color: green; }
+    .log-warning { color: orange; }
   </style>
 </head>
 <body>
-  <h1>PC Central</h1>
+  <h1>PC Central - Cabine Fotográfica</h1>
 
   <video id="videoPC" autoplay playsinline muted></video>
+  
   <div id="qrContainer"></div>
+  
+  <div id="logContainer"></div>
 
   <div>
     <button id="btnGerarQR">Gerar QR Code do controle</button>
     <button id="btnGerarVisualizador" disabled>Gerar QR Code do visualizador</button>
     <button id="btnFinalizarSessao">Finalizar sessão</button>
+    <button id="btnLimparLogs">Limpar Logs</button>
   </div>
 
-  <h3>Galeria</h3>
+  <h3>Galeria de Fotos (${fotos.length} fotos)</h3>
   <div id="galeria"></div>
 
   <script src="pc.js"></script>
