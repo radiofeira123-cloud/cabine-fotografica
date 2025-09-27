@@ -30,7 +30,7 @@ function setupPaths() {
 
 // Configuração robusta do vídeo
 function setupVideo() {
-    setupPaths(); // Configurar URLs
+    setupPaths();
     
     videoInstr.src = VIDEO_PATH;
     videoInstr.loop = true;
@@ -74,6 +74,7 @@ function showVideoFallback() {
     overlay.style.justifyContent = "center";
     overlay.style.alignItems = "center";
     overlay.style.textAlign = "center";
+    overlay.style.lineHeight = "1.5";
 }
 
 function connectWS(){
@@ -121,40 +122,57 @@ async function enterFullscreen(){
 }
 
 function handleMsg(msg){
-    if(msg.type==="end-session"){
+    if(msg.type === "end-session"){
+        logControl("📵 Recebido comando para finalizar sessão do PC");
         resetToIntro();
     }
 }
 
 async function resetToIntro(){
+    logControl("🔄 Voltando ao vídeo inicial...");
+    
+    // Limpar mensagem de sucesso
+    overlay.innerHTML = "";
+    overlay.style.display = "none";
+    
+    // Parar câmera
     try{ 
         if(videoCam.srcObject){ 
-            videoCam.srcObject.getTracks().forEach(t=>t.stop()); 
-            videoCam.srcObject=null; 
+            videoCam.srcObject.getTracks().forEach(t => t.stop()); 
+            videoCam.srcObject = null; 
         } 
-    }catch(e){ logControl("Stop cam fail: "+e);}
+    }catch(e){ logControl("Stop cam fail: " + e); }
     
+    // Mostrar vídeo de instruções
     videoInstr.style.display = "block";
     videoCam.style.display = "none";
-    overlay.innerText = "";
-    overlay.style.backgroundColor = "transparent";
+    
+    // Resetar contadores
     fotoCount = 0;
     isCounting = false;
     
+    // Reiniciar vídeo
     videoInstr.currentTime = 0;
     playVideoWithFallback();
     
+    // Sair do fullscreen
     if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+    
+    // Mostrar botão novamente
     tapBtn.style.display = "block";
-    logControl("🔄 Voltou ao início");
 }
 
 async function startPhotoFlow(){
-    if(isCounting || fotoCount>=maxFotos) return;
+    if(isCounting || fotoCount >= maxFotos){
+        logControl("Ignorando clique: contagem em andamento ou limite atingido");
+        return;
+    }
     
-    isCounting=true;
-    videoInstr.style.display="none";
-    videoCam.style.display="block";
+    isCounting = true;
+    logControl("📸 Iniciando fluxo de fotos - Foto " + (fotoCount + 1));
+    
+    videoInstr.style.display = "none";
+    videoCam.style.display = "block";
 
     try{
         const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -163,111 +181,162 @@ async function startPhotoFlow(){
         });
         videoCam.srcObject = stream;
         await videoCam.play();
+        logControl("✅ Câmera ativada");
     }catch(e){ 
-        logControl("Erro câmera: "+e); 
+        logControl("❌ Erro câmera: "+e); 
+        overlay.innerText = "❌ Erro na câmera\nRecarregue a página";
+        overlay.style.display = "flex";
         isCounting = false;
         return; 
     }
 
     const mold = new Image();
-    mold.crossOrigin="anonymous";
-    mold.src=MOLDURA_PATH;
+    mold.crossOrigin = "anonymous";
+    mold.src = MOLDURA_PATH;
 
-    await showOverlayText("Prepare-se para tirar suas fotos",1500);
+    await showOverlayText("📸 Prepare-se para tirar suas fotos", 1500);
 
-    while(fotoCount<maxFotos){
+    // TIRAR AS 3 FOTOS
+    while(fotoCount < maxFotos){
         await countdownOverlay(3);
+        
+        // CAPTURAR FOTO
         const blob = await captureFramedPhoto(videoCam, mold);
         const dataURL = await blobToDataURL(blob);
+        
+        // MOSTRAR PREVIEW POR 3 SEGUNDOS
         showPreview(dataURL);
         
-        if(ws && ws.readyState===1){
+        // ENVIAR PARA O PC
+        if(ws && ws.readyState === 1){
             ws.send(JSON.stringify({ 
-                type:"photo", 
+                type: "photo", 
                 sessionId, 
-                filename:`photo_${Date.now()}_${fotoCount+1}.jpg`, 
-                data:dataURL 
+                filename: `photo_${Date.now()}_${fotoCount+1}.jpg`, 
+                data: dataURL 
             }));
         }
         
         fotoCount++;
+        logControl(`✅ Foto ${fotoCount}/${maxFotos} capturada`);
         
+        // SE NÃO FOR A ÚLTIMA FOTO, CONTINUAR
         if(fotoCount < maxFotos){
-            await sleep(3000);
+            await sleep(3000); // Mostra a foto por 3s
             hidePreview();
-            await showOverlayText("Prepare-se para a próxima foto",1000);
+            await showOverlayText("📸 Prepare-se para a próxima foto", 1000);
         }
     }
     
-    // ⚠️ CORREÇÃO: Fluxo final correto
-    overlay.innerText="✅ Sucesso! Obrigado por utilizar a cabine fotográfica 😃";
-    overlay.style.backgroundColor="rgba(0,0,0,0.9)";
-    overlay.style.color="white";
-    overlay.style.fontSize="6vw";
-    overlay.style.display="flex";
+    // ⚠️ CORREÇÃO: ÚLTIMA FOTO MOSTRA 3s, DEPOIS MENSAGEM PERMANENTE
+    logControl("🎉 Última foto capturada, aguardando 3 segundos...");
     
-    await sleep(5000); // Mostrar mensagem por 5s
-    resetToIntro(); // Voltar ao início
-    isCounting=false;
+    // 1. Manter a última foto por 3 segundos
+    await sleep(3000);
+    hidePreview();
+    
+    // 2. Mostrar mensagem de sucesso PERMANENTE (até finalizar sessão)
+    showSuccessMessage();
+    
+    // NÃO CHAMA resetToIntro() aqui - espera comando do PC
+    isCounting = false;
+}
+
+// MOSTRAR MENSAGEM DE SUCESSO (PERMANENTE)
+function showSuccessMessage() {
+    overlay.innerHTML = `
+        <div style="text-align: center; padding: 20px;">
+            <div style="font-size: 15vw; margin-bottom: 20px;">✅</div>
+            <div style="font-size: 6vw; margin-bottom: 10px;">Fotos concluídas com sucesso!</div>
+            <div style="font-size: 4vw; margin-bottom: 20px; opacity: 0.8;">
+                Aguarde o operador finalizar a sessão...
+            </div>
+            <div style="font-size: 5vw; margin-top: 20px;">
+                📸 ${fotoCount} fotos capturadas
+            </div>
+        </div>
+    `;
+    overlay.style.backgroundColor = "rgba(0,0,0,0.95)";
+    overlay.style.color = "white";
+    overlay.style.display = "flex";
+    overlay.style.flexDirection = "column";
+    overlay.style.justifyContent = "center";
+    overlay.style.alignItems = "center";
+    overlay.style.textAlign = "center";
+    overlay.style.zIndex = "10000";
 }
 
 function captureFramedPhoto(videoEl, moldImage){
-    return new Promise(resolve=>{
-        const w=videoEl.videoWidth||1280;
-        const h=videoEl.videoHeight||720;
-        canvasHidden.width=w;
-        canvasHidden.height=h;
+    return new Promise(resolve => {
+        const w = videoEl.videoWidth || 1280;
+        const h = videoEl.videoHeight || 720;
+        canvasHidden.width = w;
+        canvasHidden.height = h;
         const ctx = canvasHidden.getContext("2d");
-        ctx.drawImage(videoEl,0,0,w,h);
+        
+        // Desenhar frame da câmera
+        ctx.drawImage(videoEl, 0, 0, w, h);
+        
+        // Aplicar moldura se carregada
+        const applyMoldura = () => {
+            if(moldImage.complete && moldImage.naturalWidth > 0){
+                ctx.drawImage(moldImage, 0, 0, w, h);
+            }
+            canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
+        };
+        
         if(moldImage.complete){
-            ctx.drawImage(moldImage,0,0,w,h);
-            canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95);
-        }else{
-            moldImage.onload=()=>{ 
-                ctx.drawImage(moldImage,0,0,w,h); 
-                canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95); 
+            applyMoldura();
+        } else {
+            moldImage.onload = applyMoldura;
+            moldImage.onerror = () => {
+                logControl("⚠️ Moldura não carregada, foto sem moldura");
+                canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
             };
         }
     });
 }
 
 function blobToDataURL(blob){
-    return new Promise(res=>{ 
-        const fr=new FileReader(); 
-        fr.onload=()=>res(fr.result); 
+    return new Promise(res => { 
+        const fr = new FileReader(); 
+        fr.onload = () => res(fr.result); 
         fr.readAsDataURL(blob); 
     });
 }
 
 function showPreview(dataURL){
-    let img=document.getElementById("__previewImg");
+    let img = document.getElementById("__previewImg");
     if(!img){
-        img=document.createElement("img");
-        img.id="__previewImg";
-        img.style.position="absolute";
-        img.style.top="0";
-        img.style.left="0";
-        img.style.width="100%";
-        img.style.height="100%";
-        img.style.objectFit="contain";
-        img.style.zIndex=9998;
+        img = document.createElement("img");
+        img.id = "__previewImg";
+        img.style.position = "absolute";
+        img.style.top = "0";
+        img.style.left = "0";
+        img.style.width = "100%";
+        img.style.height = "100%";
+        img.style.objectFit = "contain";
+        img.style.zIndex = "9998";
+        img.style.backgroundColor = "#000";
         document.body.appendChild(img);
     }
-    img.src=dataURL;
-    img.style.display="block";
-    videoCam.style.display="none";
+    img.src = dataURL;
+    img.style.display = "block";
+    videoCam.style.display = "none";
 }
 
 function hidePreview(){
-    const img=document.getElementById("__previewImg");
-    if(img) img.style.display="none";
-    videoCam.style.display="block";
+    const img = document.getElementById("__previewImg");
+    if(img) img.style.display = "none";
+    videoCam.style.display = "block";
 }
 
-function showOverlayText(text,ms){
-    overlay.innerText=text;
-    overlay.style.display="flex";
-    return sleep(ms).then(()=> overlay.innerText="");
+function showOverlayText(text, ms){
+    overlay.innerText = text;
+    overlay.style.display = "flex";
+    return sleep(ms).then(() => { 
+        overlay.innerText = "";
+    });
 }
 
 function countdownOverlay(sec){
@@ -282,9 +351,10 @@ function countdownOverlay(sec){
         overlayCount.style.alignItems = "center";
         overlayCount.style.justifyContent = "center";
         overlayCount.style.fontSize = "25vw";
-        overlayCount.style.zIndex = 9999;
+        overlayCount.style.zIndex = "9999";
         overlayCount.style.pointerEvents = "none";
         overlayCount.style.backgroundColor = "rgba(0,0,0,0.7)";
+        overlayCount.style.color = "white";
         document.body.appendChild(overlayCount);
         
         let count = sec;
@@ -303,7 +373,9 @@ function countdownOverlay(sec){
     });
 }
 
-function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+function sleep(ms){ 
+    return new Promise(r => setTimeout(r, ms)); 
+}
 
 // Inicializar
 window.addEventListener('load', () => {
