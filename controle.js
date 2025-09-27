@@ -1,6 +1,7 @@
 // controle.js - celular da cabine CORRIGIDO E COMPLETO
 const WS_URL = "wss://chatcabinerender.onrender.com";
-const MOLDURA_PATH = "assets/moldura.png";
+const MOLDURA_PATH = "moldura.png";
+const LOGO_PATH = "logo.png";
 
 let ws;
 let sessionId = null;
@@ -19,6 +20,44 @@ const contadorElement = telaContagem.querySelector(".contador");
 const videoCam = document.getElementById("videoCam");
 const overlay = document.getElementById("overlay");
 const canvasHidden = document.getElementById("canvasHidden");
+
+// Sistema de carregamento de assets
+let molduraCarregada = false;
+let assetsCarregados = false;
+
+// Pré-carregar moldura
+const mold = new Image();
+mold.crossOrigin = "anonymous";
+mold.onload = () => {
+    molduraCarregada = true;
+    logControl("✅ Moldura carregada");
+    verificarAssetsCarregados();
+};
+mold.onerror = () => {
+    logControl("⚠️ Moldura não carregada, continuando sem moldura");
+    molduraCarregada = false;
+    verificarAssetsCarregados();
+};
+mold.src = MOLDURA_PATH;
+
+// Pré-carregar logo
+const logoImg = new Image();
+logoImg.onload = () => {
+    logControl("✅ Logo carregada");
+    verificarAssetsCarregados();
+};
+logoImg.onerror = () => {
+    logControl("⚠️ Logo não carregada, usando emoji como fallback");
+    verificarAssetsCarregados();
+};
+logoImg.src = LOGO_PATH;
+
+function verificarAssetsCarregados() {
+    if (!assetsCarregados) {
+        assetsCarregados = true;
+        logControl("🎯 Assets carregados, sistema pronto");
+    }
+}
 
 // Extrair sessionId da URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -57,6 +96,9 @@ function connectWS(){
 
 function logControl(msg){
     console.log("[CONTROL]", msg);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "log", msg, sessionId }));
+    }
 }
 
 // Fluxo de telas cheias
@@ -101,20 +143,32 @@ function mostrarTela(tela) {
 
 // Contagem regressiva animada sobre vídeo
 async function countdownAnimado(segundos) {
+    // MOSTRAR VÍDEO EM TEMPO REAL durante a contagem
+    videoCam.style.display = "block";
+    
     mostrarTela(telaContagem);
-    // overlay é usado para mostrar o contador sobre o vídeo (sem fundo azul)
+    
+    // Configurar overlay para contagem sobre o vídeo
     overlay.style.display = "flex";
-    overlay.style.pointerEvents = "none";
-    videoCam.style.display = "block"; // garantir que o vídeo esteja visível atrás
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
+    overlay.style.flexDirection = "column";
+    overlay.style.backgroundColor = "rgba(0,0,0,0.3)";
+    overlay.style.fontSize = "20vw";
+    overlay.style.fontWeight = "bold";
+    overlay.style.color = "#00c6ff";
+    overlay.style.textShadow = "0 0 30px rgba(0,198,255,0.7)";
+    overlay.innerHTML = ""; // Limpar conteúdo anterior
+    
     for (let i = segundos; i >= 1; i--) {
-        contadorElement.textContent = i;
-        // animação simples forçada (reset)
-        contadorElement.style.animation = 'none';
-        // forcing reflow for restart (optional)
-        void contadorElement.offsetWidth;
-        contadorElement.style.animation = 'zoomInOut 1s ease';
+        overlay.textContent = i;
+        // Reset animation
+        overlay.style.animation = 'none';
+        void overlay.offsetWidth;
+        overlay.style.animation = 'zoomInOut 1s ease';
         await sleep(1000);
     }
+    
     overlay.style.display = "none";
     telaContagem.classList.remove('ativa');
 }
@@ -143,10 +197,6 @@ async function startPhotoFlow(){
         isCounting = false;
         return; 
     }
-
-    const mold = new Image();
-    mold.crossOrigin = "anonymous";
-    mold.src = MOLDURA_PATH;
 
     // TIRAR AS 3 FOTOS
     while(fotoCount < maxFotos){
@@ -192,9 +242,8 @@ async function startPhotoFlow(){
 // Captura de foto mantendo 16:9 e moldura
 function captureFramedPhoto(videoEl, moldImage){
     return new Promise(resolve => {
-        // usar a largura do vídeo e calcular altura 16:9
         const w = videoEl.videoWidth || Math.max(1280, Math.floor(window.innerWidth));
-        const h = Math.round(w * 9 / 16); // garantir 16:9
+        const h = Math.round(w * 9 / 16);
         canvasHidden.width = w;
         canvasHidden.height = h;
         const ctx = canvasHidden.getContext("2d");
@@ -202,21 +251,18 @@ function captureFramedPhoto(videoEl, moldImage){
         // espelhar para ficar natural (selfie)
         ctx.translate(w, 0);
         ctx.scale(-1, 1);
-        // desenhar o vídeo cortando/ajustando para 16:9
-        // centraliza verticalmente caso vídeo seja maior
-        const videoH = videoEl.videoHeight || h;
         ctx.drawImage(videoEl, 0, 0, w, h);
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // reset
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         
-        if(moldImage.complete){
+        // CORREÇÃO: Garantir que a moldura seja aplicada
+        if(molduraCarregada && moldImage.complete){
             ctx.drawImage(moldImage, 0, 0, w, h);
+            canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
         } else {
-            moldImage.onload = () => {
-                ctx.drawImage(moldImage, 0, 0, w, h);
-            };
+            // Se moldura não carregou, tirar foto sem moldura
+            logControl("⚠️ Tirando foto sem moldura");
+            canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
         }
-        
-        canvasHidden.toBlob(blob => resolve(blob), "image/jpeg", 0.95);
     });
 }
 
@@ -238,9 +284,11 @@ function atualizarMiniaturas() {
                 miniatura.style.backgroundSize = "cover";
                 miniatura.style.backgroundPosition = "center";
                 miniatura.textContent = "";
+                miniatura.classList.add('concluida');
             } else {
                 miniatura.style.backgroundImage = "none";
                 miniatura.textContent = i;
+                miniatura.classList.remove('concluida');
             }
         }
     }
@@ -252,6 +300,8 @@ function mostrarErro(mensagem) {
     overlay.style.color = "white";
     overlay.style.fontSize = "5vw";
     overlay.style.display = "flex";
+    overlay.style.alignItems = "center";
+    overlay.style.justifyContent = "center";
 }
 
 // Mensagens do WebSocket
@@ -265,10 +315,12 @@ function handleMsg(msg){
 // Reset para o início
 async function resetToIntro(){
     logControl("🔄 Voltando ao início...");
+    
     document.querySelectorAll('.tela-transicao').forEach(t => {
         t.classList.remove('ativa');
     });
     telaSessao.classList.remove('ativa');
+    
     try{ 
         if(videoCam.srcObject){ 
             videoCam.srcObject.getTracks().forEach(t => t.stop()); 
@@ -276,13 +328,25 @@ async function resetToIntro(){
             videoCam.style.display = "none";
         } 
     }catch(e){ logControl("❌ Stop cam fail: " + e); }
+    
     fotoCount = 0;
     isCounting = false;
     fotosCapturadas = [];
     atualizarMiniaturas();
-    if(document.exitFullscreen) {
-        document.exitFullscreen().catch(()=>{});
+    
+    // CORREÇÃO: NÃO sair do fullscreen
+    // Mudar texto do botão inicial
+    const btnInicial = document.querySelector('#telaInicial .btn-principal');
+    if (btnInicial) {
+        btnInicial.textContent = "👆 CLIQUE AQUI PARA INICIAR";
+        btnInicial.onclick = iniciarSessao;
     }
+    
+    const subtitle = document.querySelector('#telaInicial .subtitle');
+    if (subtitle) {
+        subtitle.textContent = "Sessão finalizada. Toque para começar novamente";
+    }
+    
     telaInicial.style.display = "flex";
     setTimeout(() => { telaInicial.style.opacity = "1"; }, 100);
 }
@@ -332,9 +396,13 @@ window.addEventListener('load', () => {
     logControl("🚀 Cabine Fotográfica carregada");
     setupPaths();
     connectWS();
+    
     // Se já estiver em tela cheia (recarregamento)
     if(document.fullscreenElement) {
         telaInicial.style.display = "none";
         telaSessao.classList.add('ativa');
     }
+    
+    // Atualizar miniaturas inicialmente
+    atualizarMiniaturas();
 });
