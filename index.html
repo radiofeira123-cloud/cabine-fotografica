@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Cabine Fotográfica - PC Central</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width:1100px; margin:10px auto; }
+  #monitor { width:100%; height:400px; background:#000; display:flex; align-items:center; justify-content:center; color:#fff; position:relative; }
+  #qrcode { position:absolute; right:12px; top:12px; background:#fff; padding:8px; border-radius:8px; }
+  #controles { margin:10px 0; }
+  #galeria { display:flex; flex-wrap:wrap; gap:10px; }
+  .thumb { position:relative; width:200px; height:130px; overflow:hidden; }
+  .thumb img{ width:100%; height:100%; object-fit:cover; }
+</style>
+</head>
+<body>
+<h1>Cabine — PC Central</h1>
+
+<div id="monitor">
+  <video id="remoteVideo" autoplay playsinline muted></video>
+  <div id="qrcode"></div>
+</div>
+
+<div id="controles">
+  <button id="btnQr">Gerar QR Code do controle</button>
+  <button id="iniciar">Iniciar sessão</button>
+  <button id="finalizar">Finalizar sessão</button>
+</div>
+
+<h3>Galeria</h3>
+<div id="galeria"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
+<script src="pc.js"></script>
+</body>
+</html>
