@@ -5,14 +5,20 @@
   <title>Cabine - PC</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 20px; }
-    button { margin: 5px; padding: 10px; }
-    #galeria { display: flex; flex-wrap: wrap; margin-top: 20px; }
-    .thumb { position: relative; margin: 5px; }
-    .thumb img { width: 200px; height: auto; display:block; }
-    .thumb button { position: absolute; top: 4px; right: 4px; background:rgba(255,255,255,0.9); border:none; padding:4px 8px; cursor:pointer; }
-    #qrContainer { margin-bottom: 20px; }
-    #videoPC { width: 480px; height: 360px; background: #000; display:block; margin-bottom:10px; }
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    button { margin: 5px; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+    #btnGerarQR { background: #0072ff; color: white; }
+    #btnGerarVisualizador { background: #00a86b; color: white; }
+    #btnFinalizarSessao { background: #ff4444; color: white; }
+    #btnLimparLogs { background: #666; color: white; }
+    button:disabled { background: #ccc !important; cursor: not-allowed; }
+    
+    #galeria { display: flex; flex-wrap: wrap; margin-top: 20px; gap: 10px; }
+    .thumb { position: relative; margin: 5px; background: white; padding: 5px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+    .thumb img { width: 200px; height: auto; display:block; border-radius: 3px; }
+    .thumb button { position: absolute; top: 4px; right: 4px; background:rgba(255,255,255,0.9); border:none; padding:4px 8px; cursor:pointer; border-radius: 3px; }
+    #qrContainer { margin-bottom: 20px; padding: 15px; background: white; border-radius: 5px; display: inline-block; }
+    #videoPC { width: 480px; height: 360px; background: #000; display:block; margin-bottom:10px; border-radius: 5px; }
     #logContainer { 
       height: 200px; 
       overflow-y: auto; 
@@ -22,15 +28,27 @@
       background: #f5f5f5; 
       font-family: monospace; 
       font-size: 12px; 
+      border-radius: 5px;
     }
     .log-entry { margin: 2px 0; }
     .log-error { color: red; }
     .log-success { color: green; }
     .log-warning { color: orange; }
+    .log-info { color: blue; }
+    
+    h1 { color: #002250; }
+    .status { background: white; padding: 10px; border-radius: 5px; margin: 10px 0; }
   </style>
 </head>
 <body>
-  <h1>PC Central - Cabine Fotográfica</h1>
+  <h1>📸 PC Central - Cabine Fotográfica</h1>
+  
+  <div class="status">
+    <strong>Status:</strong> 
+    <span id="statusWS">🔴 Desconectado</span> | 
+    <span id="statusSession">Sessão: Aguardando...</span> | 
+    <span id="statusFotos">Fotos: 0</span>
+  </div>
 
   <video id="videoPC" autoplay playsinline muted></video>
   
@@ -39,13 +57,13 @@
   <div id="logContainer"></div>
 
   <div>
-    <button id="btnGerarQR">Gerar QR Code do controle</button>
-    <button id="btnGerarVisualizador" disabled>Gerar QR Code do visualizador</button>
-    <button id="btnFinalizarSessao">Finalizar sessão</button>
-    <button id="btnLimparLogs">Limpar Logs</button>
+    <button id="btnGerarQR">📱 Gerar QR Code do controle</button>
+    <button id="btnGerarVisualizador">🔗 Gerar QR Code do visualizador</button>
+    <button id="btnFinalizarSessao">⏹️ Finalizar sessão</button>
+    <button id="btnLimparLogs">🗑️ Limpar Logs</button>
   </div>
 
-  <h3>Galeria de Fotos (${fotos.length} fotos)</h3>
+  <h3>📷 Galeria de Fotos (<span id="fotoCount">0</span> fotos)</h3>
   <div id="galeria"></div>
 
   <script src="pc.js"></script>
