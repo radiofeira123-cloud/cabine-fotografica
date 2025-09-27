@@ -78,7 +78,7 @@
       padding: 0 20px;
     }
 
-    /* Botões mais bonitos */
+    /* Botão com animação de pulsar */
     .btn-principal {
       background: linear-gradient(45deg, #00c6ff, #0072ff);
       border: none;
@@ -92,21 +92,57 @@
       box-shadow: 0 10px 30px rgba(0, 114, 255, 0.4);
       position: relative;
       overflow: hidden;
+      animation: pulsar 2s infinite;
+    }
+
+    @keyframes pulsar {
+      0% {
+        transform: scale(1);
+        box-shadow: 0 10px 30px rgba(0, 114, 255, 0.4);
+      }
+      50% {
+        transform: scale(1.05);
+        box-shadow: 0 15px 40px rgba(0, 114, 255, 0.6), 0 0 30px rgba(0, 198, 255, 0.4);
+      }
+      100% {
+        transform: scale(1);
+        box-shadow: 0 10px 30px rgba(0, 114, 255, 0.4);
+      }
     }
 
     .btn-principal:disabled {
       opacity: 0.6;
       cursor: not-allowed;
+      animation: none;
       transform: none !important;
     }
 
     .btn-principal:hover:not(:disabled) {
-      transform: translateY(-3px);
-      box-shadow: 0 15px 40px rgba(0, 114, 255, 0.6);
+      animation: none;
+      transform: scale(1.08);
+      box-shadow: 0 20px 50px rgba(0, 114, 255, 0.8), 0 0 40px rgba(0, 198, 255, 0.6);
     }
 
     .btn-principal:active {
-      transform: translateY(0);
+      transform: scale(0.95);
+    }
+
+    /* Efeito de brilho no botão */
+    .btn-principal::after {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+      transform: rotate(45deg);
+      animation: brilho 3s infinite;
+    }
+
+    @keyframes brilho {
+      0% { transform: rotate(45deg) translateX(-100%); }
+      100% { transform: rotate(45deg) translateX(100%); }
     }
 
     /* Telas de Transição */
@@ -193,15 +229,6 @@
       100% { transform: scale(1); opacity: 1; }
     }
 
-    @keyframes slideIn {
-      from { transform: translateY(50px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    .slide-in {
-      animation: slideIn 0.8s ease;
-    }
-
     /* Tela Final */
     #telaFinal {
       background: linear-gradient(135deg, #00a86b 0%, #002250 100%);
@@ -231,27 +258,23 @@
       background: linear-gradient(45deg, #00c6ff, #0072ff);
       transform: scale(1.1);
       box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+      animation: pop 0.6s ease both;
     }
 
-    /* Animações adicionais */
-    @keyframes floaty { 
-      0% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
-      100% { transform: translateY(0); }
-    }
-    
     @keyframes pop { 
       0% { transform: scale(0.8); opacity: 0; }
       60% { transform: scale(1.12); opacity: 1; }
       100% { transform: scale(1); }
     }
 
-    .miniatura.concluida { 
-      animation: pop 0.6s ease both;
-    }
-
     h1, .subtitle { 
       animation: floaty 6s ease-in-out infinite;
+    }
+
+    @keyframes floaty { 
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0); }
     }
 
     /* Mensagem de erro */
@@ -323,10 +346,9 @@
   <canvas id="canvasHidden"></canvas>
 
   <script>
-    // controle.js - CORREÇÕES FINAIS
+    // controle.js
     const WS_URL = "wss://chatcabinerender.onrender.com";
     const MOLDURA_PATH = "assets/moldura.png";
-    const LOGO_PATH = "assets/logo.png";
 
     let ws;
     let sessionId = null;
@@ -369,7 +391,6 @@
             };
             
             mold.src = MOLDURA_PATH;
-            logControl("🔄 Carregando moldura: " + MOLDURA_PATH);
         });
         
         return molduraPromise;
@@ -408,7 +429,7 @@
         console.log("[CONTROL]", msg);
     }
 
-    // CORREÇÃO: Função para obter resolução 3264x1836
+    // Função para obter resolução 3264x1836
     async function obterMelhorCamera() {
         try {
             const constraints = {
@@ -427,7 +448,6 @@
             
         } catch (error) {
             logControl("⚠️ Tentando resolução alternativa: " + error);
-            // Fallback para resolução mais baixa
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({
                     video: { 
