@@ -1,41 +1,783 @@
-/* Logo maior no celular */
-.logo {
-    width: 180px;  /* Aumentado */
-    height: 180px; /* Aumentado */
-    margin-bottom: 30px;
-}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Cabine Fotográfica</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-.logo-img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    border-radius: 25px; /* Mais arredondado */
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3); /* Sombra elegante */
-}
+    html, body {
+      height: 100%;
+      background: #000;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      overflow: hidden;
+    }
 
-/* Botões mais bonitos */
-.btn-principal {
-    background: linear-gradient(45deg, #00c6ff, #0072ff);
-    border: none;
-    padding: 20px 40px;
-    font-size: 1.3rem;
-    font-weight: bold;
-    color: white;
-    border-radius: 60px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 10px 30px rgba(0, 114, 255, 0.4);
-    position: relative;
-    overflow: hidden;
-}
+    /* Telas principais */
+    .tela {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
 
-.btn-principal:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-    transform: none !important;
-}
+    .tela.ativa {
+      display: flex;
+    }
 
-.btn-principal:hover:not(:disabled) {
-    transform: translateY(-3px);
-    box-shadow: 0 15px 40px rgba(0, 114, 255, 0.6);
-}
+    #telaInicial {
+      background: linear-gradient(135deg, #002250 0%, #0044aa 100%);
+    }
+
+    #telaSessao {
+      background: linear-gradient(135deg, #002250 0%, #0044aa 100%);
+    }
+
+    /* Logo maior */
+    .logo {
+      width: 180px;
+      height: 180px;
+      margin-bottom: 30px;
+    }
+
+    .logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-align: center;
+      background: linear-gradient(45deg, #fff, #a0d0ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+
+    .subtitle {
+      font-size: 1.1rem;
+      opacity: 0.8;
+      margin-bottom: 40px;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    /* Botões mais bonitos */
+    .btn-principal {
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
+      border: none;
+      padding: 20px 40px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: white;
+      border-radius: 60px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 30px rgba(0, 114, 255, 0.4);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-principal:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none !important;
+    }
+
+    .btn-principal:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 15px 40px rgba(0, 114, 255, 0.6);
+    }
+
+    .btn-principal:active {
+      transform: translateY(0);
+    }
+
+    /* Telas de Transição */
+    .tela-transicao {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #002250 0%, #0044aa 100%);
+      z-index: 9;
+    }
+
+    .tela-transicao.ativa {
+      display: flex;
+    }
+
+    .icone-grande {
+      font-size: 6rem;
+      margin-bottom: 30px;
+      animation: pulse 2s infinite;
+    }
+
+    .mensagem-principal {
+      font-size: 2.5rem;
+      font-weight: bold;
+      margin-bottom: 20px;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    .mensagem-secundaria {
+      font-size: 1.3rem;
+      opacity: 0.8;
+      text-align: center;
+      padding: 0 20px;
+    }
+
+    /* Elementos da câmera */
+    #videoCam {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: none;
+      transform: scaleX(-1);
+      z-index: 1;
+    }
+
+    #overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 1000;
+      font-weight: bold;
+    }
+
+    #canvasHidden {
+      display: none;
+    }
+
+    /* Animações */
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes zoomInOut {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .slide-in {
+      animation: slideIn 0.8s ease;
+    }
+
+    /* Tela Final */
+    #telaFinal {
+      background: linear-gradient(135deg, #00a86b 0%, #002250 100%);
+    }
+
+    .lista-fotos {
+      display: flex;
+      gap: 15px;
+      margin-top: 30px;
+    }
+
+    .miniatura {
+      width: 80px;
+      height: 80px;
+      border-radius: 10px;
+      border: 2px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .miniatura.concluida {
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
+      transform: scale(1.1);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    /* Animações adicionais */
+    @keyframes floaty { 
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0); }
+    }
+    
+    @keyframes pop { 
+      0% { transform: scale(0.8); opacity: 0; }
+      60% { transform: scale(1.12); opacity: 1; }
+      100% { transform: scale(1); }
+    }
+    
+    @keyframes overlayMove { 
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+      100% { transform: translateY(0); }
+    }
+
+    .miniatura.concluida { 
+      animation: pop 0.6s ease both;
+    }
+
+    h1, .subtitle { 
+      animation: floaty 6s ease-in-out infinite;
+    }
+
+    #overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+      pointer-events: none;
+      animation: overlayMove 10s linear infinite;
+      mix-blend-mode: overlay;
+      z-index: 2;
+    }
+
+    /* Mensagem de erro */
+    .mensagem-erro {
+      background: rgba(255,0,0,0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 1.2rem;
+      margin: 20px;
+      max-width: 80%;
+    }
+  </style>
+</head>
+<body>
+  <!-- Tela Inicial -->
+  <div id="telaInicial" class="tela ativa">
+    <div class="logo">
+      <img src="assets/logo.png" alt="Cabine Fotográfica" class="logo-img" onerror="this.style.display='none'; this.parentElement.innerHTML='📸';">
+    </div>
+    <h1 class="slide-in">CABINE FOTOGRÁFICA</h1>
+    <p class="subtitle slide-in">Toque para entrar em tela cheia</p>
+    <button class="btn-principal slide-in" onclick="entrarTelaCheia()">
+      👆 CLIQUE AQUI PARA INICIAR
+    </button>
+  </div>
+
+  <!-- Tela de Sessão -->
+  <div id="telaSessao" class="tela">
+    <div class="logo">
+      <img src="assets/logo.png" alt="Cabine Fotográfica" class="logo-img" onerror="this.style.display='none'; this.parentElement.innerHTML='📸';">
+    </div>
+    <h1>PRONTO PARA COMEÇAR?</h1>
+    <p class="subtitle">Sessão fotográfica com 3 fotos automáticas</p>
+    <button class="btn-principal" onclick="iniciarSessao()">
+      🚀 INICIAR SESSÃO
+    </button>
+  </div>
+
+  <!-- Telas de Transição -->
+  <div id="telaPrepareSe" class="tela-transicao">
+    <div class="icone-grande">📸</div>
+    <div class="mensagem-principal">PREPARE-SE!</div>
+    <div class="mensagem-secundaria">A sessão fotográfica vai começar</div>
+  </div>
+
+  <div id="telaContagem" class="tela-transicao">
+    <div class="mensagem-principal">SORRIA!</div>
+    <div class="mensagem-secundaria">A foto será tirada em instantes</div>
+  </div>
+
+  <div id="telaFinal" class="tela-transicao">
+    <div class="logo">
+      <img src="assets/logo.png" alt="Cabine Fotográfica" class="logo-img" onerror="this.style.display='none'; this.parentElement.innerHTML='✅';">
+    </div>
+    <div class="mensagem-principal">FOTOS CONCLUÍDAS!</div>
+    <div class="mensagem-secundaria">Aguarde o operador finalizar a sessão</div>
+    <div class="lista-fotos">
+      <div class="miniatura" id="miniatura1">1</div>
+      <div class="miniatura" id="miniatura2">2</div>
+      <div class="miniatura" id="miniatura3">3</div>
+    </div>
+  </div>
+
+  <!-- Elementos da câmera -->
+  <video id="videoCam" autoplay playsinline></video>
+  <div id="overlay"></div>
+  <canvas id="canvasHidden"></canvas>
+
+  <script>
+    // controle.js - CORREÇÕES FINAIS
+    const WS_URL = "wss://chatcabinerender.onrender.com";
+    const MOLDURA_PATH = "assets/moldura.png";
+    const LOGO_PATH = "assets/logo.png";
+
+    let ws;
+    let sessionId = null;
+    let fotoCount = 0;
+    let maxFotos = 3;
+    let isCounting = false;
+    let fotosCapturadas = [];
+    let cameraStream = null;
+
+    // Elementos da interface
+    const telaInicial = document.getElementById("telaInicial");
+    const telaSessao = document.getElementById("telaSessao");
+    const telaPrepareSe = document.getElementById("telaPrepareSe");
+    const telaContagem = document.getElementById("telaContagem");
+    const videoCam = document.getElementById("videoCam");
+    const overlay = document.getElementById("overlay");
+    const canvasHidden = document.getElementById("canvasHidden");
+
+    // Sistema de carregamento da moldura
+    let molduraCarregada = false;
+    let molduraPromise = null;
+
+    function carregarMoldura() {
+        if (molduraPromise) return molduraPromise;
+        
+        molduraPromise = new Promise((resolve, reject) => {
+            const mold = new Image();
+            mold.crossOrigin = "anonymous";
+            
+            mold.onload = () => {
+                molduraCarregada = true;
+                logControl("✅ Moldura carregada com sucesso");
+                resolve(mold);
+            };
+            
+            mold.onerror = () => {
+                logControl("❌ Erro ao carregar moldura - continuando sem moldura");
+                molduraCarregada = false;
+                resolve(null);
+            };
+            
+            mold.src = MOLDURA_PATH;
+            logControl("🔄 Carregando moldura: " + MOLDURA_PATH);
+        });
+        
+        return molduraPromise;
+    }
+
+    // Extrair sessionId da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    sessionId = urlParams.get('session');
+    logControl("SessionID: " + sessionId);
+
+    // WebSocket
+    function connectWS(){
+        if(ws && ws.readyState === WebSocket.OPEN) return;
+        
+        ws = new WebSocket(WS_URL);
+        ws.onopen = ()=> {
+            logControl("✅ WebSocket conectado");
+            if (sessionId) {
+                ws.send(JSON.stringify({ type: "register", role: "control", sessionId }));
+            }
+        };
+        ws.onmessage = (ev)=>{
+            try{
+                const msg = JSON.parse(ev.data);
+                handleMsg(msg);
+            }catch(e){ logControl("❌ Erro parse WS: "+e); }
+        };
+        ws.onclose = ()=> { 
+            logControl("🔌 WebSocket fechado, reconectando...");
+            setTimeout(connectWS, 2000); 
+        };
+        ws.onerror = (e)=> logControl("❌ WS error: "+e);
+    }
+
+    function logControl(msg){
+        console.log("[CONTROL]", msg);
+    }
+
+    // CORREÇÃO: Função para obter a melhor resolução da câmera
+    async function obterMelhorCamera() {
+        try {
+            const constraints = {
+                video: {
+                    facingMode: "user",
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 },
+                    aspectRatio: { ideal: 16/9 }
+                },
+                audio: false
+            };
+            
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
+            logControl("📷 Câmera configurada com alta resolução");
+            return stream;
+            
+        } catch (error) {
+            logControl("⚠️ Usando resolução padrão: " + error);
+            // Fallback para resolução básica
+            return await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "user" },
+                audio: false
+            });
+        }
+    }
+
+    // Fluxo de telas cheias
+    async function entrarTelaCheia() {
+        try {
+            logControl("📱 Entrando em tela cheia...");
+            await document.documentElement.requestFullscreen();
+            
+            telaInicial.style.display = "none";
+            telaSessao.style.display = "flex";
+            telaSessao.classList.add('ativa');
+            logControl("✅ Tela cheia ativada");
+            
+        } catch (error) {
+            logControl("❌ Erro ao entrar em tela cheia: " + error);
+            telaInicial.style.display = "none";
+            telaSessao.style.display = "flex";
+            telaSessao.classList.add('ativa');
+        }
+    }
+
+    async function iniciarSessao() {
+        if(isCounting) {
+            logControl("⚠️ Sessão já em andamento");
+            return;
+        }
+        
+        logControl("🎬 Iniciando sessão fotográfica");
+        telaSessao.style.display = "none";
+        mostrarTela(telaPrepareSe);
+        await sleep(2000);
+        startPhotoFlow();
+    }
+
+    // CORREÇÃO: Função para mostrar telas
+    function mostrarTela(tela) {
+        // Esconder todas as telas
+        document.querySelectorAll('.tela, .tela-transicao').forEach(t => {
+            t.style.display = 'none';
+            t.classList.remove('ativa');
+        });
+        
+        // Mostrar apenas a tela desejada
+        tela.style.display = 'flex';
+        tela.classList.add('ativa');
+    }
+
+    // Contagem regressiva SOBRE a câmera
+    async function countdownAnimado(segundos) {
+        logControl("🔴 INICIANDO CONTAGEM SOBRE CÂMERA");
+        
+        // Mostrar apenas a câmera
+        videoCam.style.display = "block";
+        overlay.style.display = "flex";
+        
+        // Configurar overlay
+        overlay.style.position = "fixed";
+        overlay.style.top = "0";
+        overlay.style.left = "0";
+        overlay.style.width = "100%";
+        overlay.style.height = "100%";
+        overlay.style.backgroundColor = "rgba(0,0,0,0.3)";
+        overlay.style.color = "#00ff00";
+        overlay.style.fontSize = "25vw";
+        overlay.style.fontWeight = "bold";
+        overlay.style.alignItems = "center";
+        overlay.style.justifyContent = "center";
+        overlay.style.zIndex = "1000";
+        overlay.style.textShadow = "0 0 20px #00ff00, 0 0 30px #00ff00";
+        
+        for (let i = segundos; i >= 1; i--) {
+            overlay.textContent = i;
+            overlay.style.animation = 'none';
+            void overlay.offsetWidth;
+            overlay.style.animation = 'zoomInOut 1s ease';
+            await sleep(1000);
+        }
+        
+        overlay.textContent = "📸 SORRIA!";
+        overlay.style.fontSize = "15vw";
+        overlay.style.color = "#ff9900";
+        overlay.style.textShadow = "0 0 20px #ff9900, 0 0 30px #ff9900";
+        await sleep(1000);
+        
+        overlay.style.display = "none";
+    }
+
+    // CORREÇÃO: Fluxo principal com melhor resolução
+    async function startPhotoFlow(){
+        if(isCounting) return;
+        
+        isCounting = true;
+        fotoCount = 0;
+        fotosCapturadas = [];
+
+        // Carregar moldura
+        const molduraImg = await carregarMoldura();
+
+        // CORREÇÃO: Usar função de melhor resolução
+        try{
+            cameraStream = await obterMelhorCamera();
+            videoCam.srcObject = cameraStream;
+            videoCam.style.display = "block";
+            
+            await new Promise((resolve) => {
+                videoCam.onloadedmetadata = resolve;
+            });
+            
+            await videoCam.play();
+            logControl(`✅ Câmera ativada: ${videoCam.videoWidth}x${videoCam.videoHeight}`);
+        }catch(e){ 
+            logControl("❌ Erro câmera: "+e); 
+            mostrarErro("❌ Erro na câmera");
+            isCounting = false;
+            return; 
+        }
+
+        // TIRAR AS 3 FOTOS
+        while(fotoCount < maxFotos && isCounting){
+            logControl(`📸 Foto ${fotoCount + 1} de ${maxFotos}`);
+            
+            mostrarTela(telaPrepareSe);
+            await sleep(2000);
+            
+            await countdownAnimado(3);
+            
+            // CORREÇÃO: Capturar com alta qualidade
+            const blob = await captureFramedPhoto(videoCam, molduraImg);
+            if (!blob) {
+                logControl("❌ Erro ao capturar foto");
+                continue;
+            }
+            
+            const dataURL = await blobToDataURL(blob);
+            fotosCapturadas.push(dataURL);
+
+            showPreview(dataURL);
+            
+            if(ws && ws.readyState === WebSocket.OPEN){
+                ws.send(JSON.stringify({ 
+                    type: "photo", 
+                    sessionId, 
+                    filename: `photo_${Date.now()}_${fotoCount+1}_${videoCam.videoWidth}x${videoCam.videoHeight}.jpg`, 
+                    data: dataURL 
+                }));
+            }
+            
+            fotoCount++;
+            atualizarMiniaturas();
+            
+            if(fotoCount < maxFotos){
+                await sleep(3000);
+                hidePreview();
+                await sleep(1000);
+            }
+        }
+        
+        if(isCounting) {
+            await sleep(3000);
+            hidePreview();
+            mostrarTelaFinal();
+        }
+        isCounting = false;
+    }
+
+    // CORREÇÃO: Captura em alta resolução
+    function captureFramedPhoto(videoEl, molduraImg){
+        return new Promise(resolve => {
+            // Usar a resolução REAL do vídeo
+            const w = videoEl.videoWidth;
+            const h = videoEl.videoHeight;
+            
+            logControl(`🖼️ Capturando em: ${w}x${h}`);
+            
+            canvasHidden.width = w;
+            canvasHidden.height = h;
+            const ctx = canvasHidden.getContext("2d", { willReadFrequently: true });
+            
+            // Desenhar vídeo (espelhado)
+            ctx.translate(w, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(videoEl, 0, 0, w, h);
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            
+            // Aplicar moldura
+            if (molduraCarregada && molduraImg) {
+                ctx.drawImage(molduraImg, 0, 0, w, h);
+            }
+            
+            // CORREÇÃO: Qualidade máxima
+            canvasHidden.toBlob(blob => {
+                logControl(`✅ Foto capturada: ${(blob.size/1024/1024).toFixed(2)}MB`);
+                resolve(blob);
+            }, "image/jpeg", 0.95); // 95% de qualidade
+        });
+    }
+
+    function mostrarTelaFinal() {
+        const telaFinal = document.getElementById("telaFinal");
+        mostrarTela(telaFinal);
+    }
+
+    function atualizarMiniaturas() {
+        for(let i = 1; i <= 3; i++) {
+            const miniatura = document.getElementById(`miniatura${i}`);
+            if(miniatura && i <= fotosCapturadas.length) {
+                miniatura.style.backgroundImage = `url(${fotosCapturadas[i-1]})`;
+                miniatura.style.backgroundSize = "cover";
+                miniatura.textContent = "";
+                miniatura.classList.add('concluida');
+            }
+        }
+    }
+
+    function mostrarErro(mensagem) {
+        overlay.innerText = mensagem;
+        overlay.style.backgroundColor = "rgba(255,0,0,0.9)";
+        overlay.style.color = "white";
+        overlay.style.fontSize = "5vw";
+        overlay.style.display = "flex";
+        overlay.style.alignItems = "center";
+        overlay.style.justifyContent = "center";
+    }
+
+    // CORREÇÃO: Reset melhorado
+    async function resetToIntro(){
+        logControl("🔄 Resetando para início...");
+        
+        isCounting = false; // IMPORTANTE: Parar o loop de fotos
+        
+        // Parar câmera corretamente
+        if(cameraStream) {
+            cameraStream.getTracks().forEach(track => {
+                track.stop();
+                cameraStream.removeTrack(track);
+            });
+            cameraStream = null;
+        }
+        
+        if(videoCam.srcObject) {
+            videoCam.srcObject = null;
+        }
+        
+        videoCam.style.display = "none";
+        overlay.style.display = "none";
+        
+        const previewImg = document.getElementById("__previewImg");
+        if(previewImg) previewImg.style.display = "none";
+        
+        // Resetar variáveis
+        fotoCount = 0;
+        fotosCapturadas = [];
+        
+        // Mostrar tela inicial
+        mostrarTela(telaInicial);
+        
+        // CORREÇÃO: Reativar botão
+        const btnInicial = document.querySelector('#telaInicial .btn-principal');
+        if (btnInicial) {
+            btnInicial.disabled = false;
+            btnInicial.onclick = iniciarSessao;
+            btnInicial.style.opacity = "1";
+        }
+        
+        logControl("✅ Reset completo");
+    }
+
+    function handleMsg(msg){
+        if(msg.type === "end-session"){
+            logControl("📵 Finalizando sessão...");
+            resetToIntro();
+        }
+    }
+
+    // Preview das fotos
+    function showPreview(dataURL){
+        videoCam.style.display = "none";
+        overlay.style.display = "none";
+        
+        let img = document.getElementById("__previewImg");
+        if(!img){
+            img = document.createElement("img");
+            img.id = "__previewImg";
+            img.style.position = "fixed";
+            img.style.top = "0";
+            img.style.left = "0";
+            img.style.width = "100%";
+            img.style.height = "100%";
+            img.style.objectFit = "contain";
+            img.style.zIndex = "9999";
+            img.style.backgroundColor = "#000";
+            document.body.appendChild(img);
+        }
+        img.src = dataURL;
+        img.style.display = "block";
+    }
+
+    function hidePreview(){
+        const img = document.getElementById("__previewImg");
+        if(img) img.style.display = "none";
+        videoCam.style.display = "block";
+    }
+
+    // Utilitários
+    function blobToDataURL(blob){
+        return new Promise(res => { 
+            const fr = new FileReader(); 
+            fr.onload = () => res(fr.result); 
+            fr.readAsDataURL(blob); 
+        });
+    }
+
+    function sleep(ms){ 
+        return new Promise(r => setTimeout(r, ms)); 
+    }
+
+    // Inicializar
+    window.addEventListener('load', () => {
+        logControl("🚀 Sistema carregado");
+        connectWS();
+        carregarMoldura();
+        
+        if(document.fullscreenElement) {
+            telaInicial.style.display = "none";
+            telaSessao.style.display = "flex";
+            telaSessao.classList.add('ativa');
+        }
+    });
+  </script>
+</body>
+</html>
