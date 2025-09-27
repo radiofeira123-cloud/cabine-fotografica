@@ -227,18 +227,31 @@
       document.getElementById('photoModal').style.display = 'none';
     }
 
-    // CORREÇÃO: Download direto da URL (não precisa do ImgBB)
+    // CORREÇÃO: Download forçado (não abre o ImgBB)
     function downloadPhoto(url, number) {
-      // Forçar download diretamente da URL
+      // Criar um link temporário para forçar o download
       const link = document.createElement('a');
       link.href = url;
-      link.download = `cabine_foto_${number}_${Date.now()}.jpg`;
-      link.target = '_blank';
+      
+      // Nome do arquivo com timestamp para evitar cache
+      const fileName = `cabine_foto_${number}_${Date.now()}.jpg`;
+      link.download = fileName;
       
       // Adicionar ao DOM, clicar e remover
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Feedback visual
+      const btn = event.target;
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '✅ Baixado!';
+      btn.style.background = '#27ae60';
+      
+      setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.background = '#3498db';
+      }, 2000);
     }
 
     window.addEventListener('load', () => {
