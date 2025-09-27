@@ -197,6 +197,7 @@
       <button class="btn btn-success" id="btnGerarVisualizador">🔗 QR Visualizador</button>
       <button class="btn btn-danger" id="btnFinalizarSessao">⏹️ Finalizar Sessão</button>
       <button class="btn btn-secondary" id="btnLimparLogs">🗑️ Limpar Logs</button>
+      <button class="btn btn-secondary" id="btnLimparFotos">🗑️ Limpar Fotos</button>
     </div>
 
     <div id="qrContainer"></div>
@@ -212,7 +213,7 @@
   </div>
 
   <script>
-    // pc.js - CORRIGIDO (finalizar não reenvia, limpa tela)
+    // pc.js - CORRIGIDO (finalizar limpa fotos, botões não travam)
     const WS_URL = "wss://chatcabinerender.onrender.com";
     const IMGBB_API_KEY = "6734e028b20f88d5795128d242f85582";
 
@@ -232,6 +233,7 @@
     const btnGerarVisualizador = document.getElementById("btnGerarVisualizador");
     const btnFinalizarSessao = document.getElementById("btnFinalizarSessao");
     const btnLimparLogs = document.getElementById("btnLimparLogs");
+    const btnLimparFotos = document.getElementById("btnLimparFotos");
     const statusWS = document.getElementById("statusWS");
     const statusSession = document.getElementById("statusSession");
     const statusFotos = document.getElementById("statusFotos");
@@ -566,17 +568,18 @@
         updateUI();
     }
 
+    // CORREÇÃO: Finalizar sessão limpa as fotos
     async function finalizarSessao() {
         if (fotos.length === 0) {
             alert("📭 Nenhuma foto na sessão.");
             return;
         }
         
-        if (!confirm(`Deseja finalizar a sessão? O celular voltará ao início.`)) {
+        if (!confirm(`Deseja finalizar a sessão? ${fotos.length} foto${fotos.length !== 1 ? 's' : ''} serão removidas e o celular voltará ao início.`)) {
             return;
         }
         
-        // CORREÇÃO: Apenas enviar comando para celular, NÃO reenviar fotos
+        // Enviar comando para celular
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ 
                 type: "end-session", 
@@ -585,26 +588,57 @@
             logPC("📵 Comando 'end-session' enviado para o celular", "success");
         }
         
-        // CORREÇÃO: Limpar QR code e manter fotos
+        // CORREÇÃO: Limpar fotos da tela
+        fotos = [];
+        renderGallery();
         clearQR();
         
-        alert("✅ Sessão finalizada! O celular voltou ao início.");
+        logPC("🗑️ Todas as fotos removidas da galeria", "warning");
+        alert("✅ Sessão finalizada! Fotos removidas e celular resetado.");
         updateUI();
     }
 
+    // CORREÇÃO: Botão para limpar fotos manualmente
+    function limparFotos() {
+        if (fotos.length === 0) {
+            alert("📭 Nenhuma foto para limpar.");
+            return;
+        }
+        
+        if (confirm(`Deseja limpar todas as ${fotos.length} foto${fotos.length !== 1 ? 's' : ''}?`)) {
+            fotos = [];
+            renderGallery();
+            clearQR();
+            logPC("🗑️ Todas as fotos removidas manualmente", "warning");
+            alert("✅ Fotos removidas!");
+            updateUI();
+        }
+    }
+
+    // CORREÇÃO: Botões NUNCA travam (exceto quando realmente não faz sentido)
     function updateUI() {
         const hasSession = !!sessionId;
         const hasPhotos = fotos.length > 0;
         const isConnected = ws && ws.readyState === WebSocket.OPEN;
         
-        btnGerarQR.disabled = !hasSession || !isConnected;
+        // Botão QR Controle: só precisa de sessão (não trava depois)
+        btnGerarQR.disabled = !hasSession;
+        
+        // Botão QR Visualizador: precisa de fotos
         btnGerarVisualizador.disabled = !hasPhotos;
-        btnFinalizarSessao.disabled = !hasSession || !hasPhotos || !isConnected;
+        
+        // Botão Finalizar: precisa de fotos e conexão
+        btnFinalizarSessao.disabled = !hasPhotos || !isConnected;
+        
+        // Botão Limpar Fotos: precisa de fotos
+        btnLimparFotos.disabled = !hasPhotos;
         
         if (hasPhotos) {
             btnFinalizarSessao.textContent = `⏹️ Finalizar (${fotos.length})`;
+            btnLimparFotos.textContent = `🗑️ Limpar (${fotos.length})`;
         } else {
             btnFinalizarSessao.textContent = "⏹️ Finalizar Sessão";
+            btnLimparFotos.textContent = "🗑️ Limpar Fotos";
         }
         
         updateStatus();
@@ -618,6 +652,7 @@
         logContainer.innerHTML = "";
         logPC("📋 Logs limpos", "info");
     };
+    btnLimparFotos.onclick = limparFotos;
 
     window.addEventListener("beforeunload", () => {
         if (ws) ws.close(1000, "Fechando página");
