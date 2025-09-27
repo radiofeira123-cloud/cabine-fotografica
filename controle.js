@@ -1,4 +1,4 @@
-// controle.js - CORREÇÕES FINAIS
+// controle.js - CORREÇÃO DA RESOLUÇÃO E OUTROS PROBLEMAS
 const WS_URL = "wss://chatcabinerender.onrender.com";
 const MOLDURA_PATH = "assets/moldura.png";
 const LOGO_PATH = "assets/logo.png";
@@ -9,6 +9,7 @@ let fotoCount = 0;
 let maxFotos = 3;
 let isCounting = false;
 let fotosCapturadas = [];
+let cameraStream = null; // CORREÇÃO: Guardar a stream globalmente
 
 // Elementos da interface
 const telaInicial = document.getElementById("telaInicial");
@@ -19,7 +20,7 @@ const videoCam = document.getElementById("videoCam");
 const overlay = document.getElementById("overlay");
 const canvasHidden = document.getElementById("canvasHidden");
 
-// Sistema de carregamento da moldura
+// Sistema de carregamento
 let molduraCarregada = false;
 let molduraPromise = null;
 
@@ -37,13 +38,12 @@ function carregarMoldura() {
         };
         
         mold.onerror = () => {
-            logControl("❌ Erro ao carregar moldura - continuando sem moldura");
+            logControl("❌ Erro ao carregar moldura");
             molduraCarregada = false;
             resolve(null);
         };
         
         mold.src = MOLDURA_PATH;
-        logControl("🔄 Carregando moldura: " + MOLDURA_PATH);
     });
     
     return molduraPromise;
@@ -82,7 +82,37 @@ function logControl(msg){
     console.log("[CONTROL]", msg);
 }
 
-// Fluxo de telas cheias
+// CORREÇÃO: Função para obter a melhor resolução da câmera
+async function obterMelhorCamera() {
+    try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        
+        // Tentar resoluções altas
+        const constraints = {
+            video: {
+                facingMode: "user",
+                width: { ideal: 1920 },
+                height: { ideal: 1080 },
+                aspectRatio: { ideal: 16/9 }
+            },
+            audio: false
+        };
+        
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        logControl("📷 Câmera configurada com alta resolução");
+        return stream;
+        
+    } catch (error) {
+        logControl("⚠️ Usando resolução padrão: " + error);
+        // Fallback para resolução básica
+        return await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "user" },
+            audio: false
+        });
+    }
+}
+
 async function entrarTelaCheia() {
     try {
         logControl("📱 Entrando em tela cheia...");
@@ -91,7 +121,6 @@ async function entrarTelaCheia() {
         telaInicial.style.display = "none";
         telaSessao.style.display = "flex";
         telaSessao.classList.add('ativa');
-        logControl("✅ Tela cheia ativada");
         
     } catch (error) {
         logControl("❌ Erro ao entrar em tela cheia: " + error);
@@ -102,7 +131,10 @@ async function entrarTelaCheia() {
 }
 
 async function iniciarSessao() {
-    if(isCounting) return;
+    if(isCounting) {
+        logControl("⚠️ Sessão já em andamento");
+        return;
+    }
     
     logControl("🎬 Iniciando sessão fotográfica");
     telaSessao.style.display = "none";
@@ -111,41 +143,28 @@ async function iniciarSessao() {
     startPhotoFlow();
 }
 
-// CORREÇÃO: Função para mostrar telas
 function mostrarTela(tela) {
-    // Esconder todas as telas
     document.querySelectorAll('.tela, .tela-transicao').forEach(t => {
         t.style.display = 'none';
         t.classList.remove('ativa');
     });
     
-    // Mostrar apenas a tela desejada
     tela.style.display = 'flex';
     tela.classList.add('ativa');
 }
 
-// Contagem regressiva SOBRE a câmera
+// Contagem regressiva
 async function countdownAnimado(segundos) {
-    logControl("🔴 INICIANDO CONTAGEM SOBRE CÂMERA");
-    
-    // Mostrar apenas a câmera
     videoCam.style.display = "block";
     overlay.style.display = "flex";
     
-    // Configurar overlay
-    overlay.style.position = "fixed";
-    overlay.style.top = "0";
-    overlay.style.left = "0";
-    overlay.style.width = "100%";
-    overlay.style.height = "100%";
-    overlay.style.backgroundColor = "rgba(0,0,0,0.3)";
-    overlay.style.color = "#00ff00";
-    overlay.style.fontSize = "25vw";
-    overlay.style.fontWeight = "bold";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-    overlay.style.zIndex = "1000";
-    overlay.style.textShadow = "0 0 20px #00ff00, 0 0 30px #00ff00";
+    overlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.3); color: #00ff00; font-size: 25vw;
+        font-weight: bold; display: flex; align-items: center; 
+        justify-content: center; z-index: 1000;
+        text-shadow: 0 0 20px #00ff00, 0 0 30px #00ff00;
+    `;
     
     for (let i = segundos; i >= 1; i--) {
         overlay.textContent = i;
@@ -164,7 +183,7 @@ async function countdownAnimado(segundos) {
     overlay.style.display = "none";
 }
 
-// Fluxo principal de fotos
+// CORREÇÃO: Fluxo principal com melhor resolução
 async function startPhotoFlow(){
     if(isCounting) return;
     
@@ -173,45 +192,37 @@ async function startPhotoFlow(){
     fotosCapturadas = [];
 
     // Carregar moldura
-    logControl("🔄 Carregando moldura...");
     const molduraImg = await carregarMoldura();
 
-    // CORREÇÃO: Ativar câmera com tratamento de erro melhorado
+    // CORREÇÃO: Usar função de melhor resolução
     try{
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "user", aspectRatio: 16/9 }, 
-            audio: false 
-        });
-        videoCam.srcObject = stream;
+        cameraStream = await obterMelhorCamera();
+        videoCam.srcObject = cameraStream;
         videoCam.style.display = "block";
         
-        // Esperar o vídeo carregar
         await new Promise((resolve) => {
-            videoCam.onloadeddata = resolve;
-            setTimeout(resolve, 1000); // Timeout de segurança
+            videoCam.onloadedmetadata = resolve;
         });
         
         await videoCam.play();
-        logControl("✅ Câmera ativada e funcionando");
+        logControl(`✅ Câmera ativada: ${videoCam.videoWidth}x${videoCam.videoHeight}`);
     }catch(e){ 
         logControl("❌ Erro câmera: "+e); 
-        mostrarErro("❌ Erro na câmera\nRecarregue a página");
+        mostrarErro("❌ Erro na câmera");
         isCounting = false;
         return; 
     }
 
     // TIRAR AS 3 FOTOS
-    while(fotoCount < maxFotos){
-        logControl(`📸 PREPARANDO FOTO ${fotoCount + 1}`);
+    while(fotoCount < maxFotos && isCounting){
+        logControl(`📸 Foto ${fotoCount + 1} de ${maxFotos}`);
         
-        // Tela "Prepare-se"
         mostrarTela(telaPrepareSe);
         await sleep(2000);
         
-        // Contagem regressiva sobre a câmera
         await countdownAnimado(3);
         
-        // Tirar foto com moldura
+        // CORREÇÃO: Capturar com alta qualidade
         const blob = await captureFramedPhoto(videoCam, molduraImg);
         if (!blob) {
             logControl("❌ Erro ao capturar foto");
@@ -221,24 +232,20 @@ async function startPhotoFlow(){
         const dataURL = await blobToDataURL(blob);
         fotosCapturadas.push(dataURL);
 
-        // Mostrar preview
         showPreview(dataURL);
         
-        // Enviar para PC
         if(ws && ws.readyState === WebSocket.OPEN){
             ws.send(JSON.stringify({ 
                 type: "photo", 
                 sessionId, 
-                filename: `photo_${Date.now()}_${fotoCount+1}.jpg`, 
+                filename: `photo_${Date.now()}_${fotoCount+1}_${videoCam.videoWidth}x${videoCam.videoHeight}.jpg`, 
                 data: dataURL 
             }));
         }
         
         fotoCount++;
         atualizarMiniaturas();
-        logControl(`✅ Foto ${fotoCount}/${maxFotos} capturada`);
         
-        // Pausa entre fotos (se não for a última)
         if(fotoCount < maxFotos){
             await sleep(3000);
             hidePreview();
@@ -246,132 +253,114 @@ async function startPhotoFlow(){
         }
     }
     
-    // Sessão concluída
-    await sleep(3000);
-    hidePreview();
-    mostrarTelaFinal();
+    if(isCounting) {
+        await sleep(3000);
+        hidePreview();
+        mostrarTelaFinal();
+    }
     isCounting = false;
 }
 
-// Captura de foto com moldura
+// CORREÇÃO: Captura em alta resolução
 function captureFramedPhoto(videoEl, molduraImg){
     return new Promise(resolve => {
-        const w = videoEl.videoWidth || 1280;
-        const h = Math.round(w * 9 / 16);
+        // Usar a resolução REAL do vídeo
+        const w = videoEl.videoWidth;
+        const h = videoEl.videoHeight;
+        
+        logControl(`🖼️ Capturando em: ${w}x${h}`);
         
         canvasHidden.width = w;
         canvasHidden.height = h;
-        const ctx = canvasHidden.getContext("2d");
+        const ctx = canvasHidden.getContext("2d", { willReadFrequently: true });
         
-        // 1. Desenhar o vídeo (espelhado para selfie)
+        // Desenhar vídeo (espelhado)
         ctx.translate(w, 0);
         ctx.scale(-1, 1);
         ctx.drawImage(videoEl, 0, 0, w, h);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         
-        // 2. Desenhar a moldura se estiver carregada
-        if (molduraCarregada && molduraImg && molduraImg.complete) {
+        // Aplicar moldura
+        if (molduraCarregada && molduraImg) {
             ctx.drawImage(molduraImg, 0, 0, w, h);
         }
         
-        // 3. Converter para blob
+        // CORREÇÃO: Qualidade máxima
         canvasHidden.toBlob(blob => {
+            logControl(`✅ Foto capturada: ${(blob.size/1024/1024).toFixed(2)}MB`);
             resolve(blob);
-        }, "image/jpeg", 0.92);
+        }, "image/jpeg", 0.95); // 95% de qualidade
     });
 }
 
 function mostrarTelaFinal() {
     const telaFinal = document.getElementById("telaFinal");
     mostrarTela(telaFinal);
-    logControl("🎉 Todas as fotos concluídas");
 }
 
 function atualizarMiniaturas() {
     for(let i = 1; i <= 3; i++) {
         const miniatura = document.getElementById(`miniatura${i}`);
-        if(miniatura) {
-            if(i <= fotosCapturadas.length) {
-                miniatura.style.backgroundImage = `url(${fotosCapturadas[i-1]})`;
-                miniatura.style.backgroundSize = "cover";
-                miniatura.style.backgroundPosition = "center";
-                miniatura.textContent = "";
-                miniatura.classList.add('concluida');
-            }
+        if(miniatura && i <= fotosCapturadas.length) {
+            miniatura.style.backgroundImage = `url(${fotosCapturadas[i-1]})`;
+            miniatura.style.backgroundSize = "cover";
+            miniatura.textContent = "";
+            miniatura.classList.add('concluida');
         }
     }
 }
 
-function mostrarErro(mensagem) {
-    overlay.innerText = mensagem;
-    overlay.style.backgroundColor = "rgba(255,0,0,0.9)";
-    overlay.style.color = "white";
-    overlay.style.fontSize = "5vw";
-    overlay.style.display = "flex";
-    overlay.style.alignItems = "center";
-    overlay.style.justifyContent = "center";
-}
-
-// Mensagens do WebSocket
-function handleMsg(msg){
-    if(msg.type === "end-session"){
-        logControl("📵 Recebido comando para finalizar sessão do PC");
-        resetToIntro();
-    }
-}
-
-// CORREÇÃO: Reset para o início (sem tela preta)
+// CORREÇÃO: Reset melhorado
 async function resetToIntro(){
-    logControl("🔄 Voltando ao início...");
+    logControl("🔄 Resetando para início...");
     
-    // Parar câmera
-    try{ 
-        if(videoCam.srcObject){ 
-            videoCam.srcObject.getTracks().forEach(t => t.stop()); 
-            videoCam.srcObject = null; 
-        } 
-    }catch(e){}
+    isCounting = false; // IMPORTANTE: Parar o loop de fotos
     
-    // Resetar variáveis
-    fotoCount = 0;
-    isCounting = false;
-    fotosCapturadas = [];
+    // Parar câmera corretamente
+    if(cameraStream) {
+        cameraStream.getTracks().forEach(track => {
+            track.stop();
+            cameraStream.removeTrack(track);
+        });
+        cameraStream = null;
+    }
     
-    // CORREÇÃO: Esconder todos os elementos de câmera/preview
+    if(videoCam.srcObject) {
+        videoCam.srcObject = null;
+    }
+    
     videoCam.style.display = "none";
     overlay.style.display = "none";
     
     const previewImg = document.getElementById("__previewImg");
     if(previewImg) previewImg.style.display = "none";
     
-    // CORREÇÃO: Mostrar tela inicial CORRETAMENTE
-    telaInicial.style.display = "flex";
-    telaInicial.classList.add('ativa');
+    // Resetar variáveis
+    fotoCount = 0;
+    fotosCapturadas = [];
     
-    // Esconder outras telas
-    document.querySelectorAll('.tela, .tela-transicao').forEach(t => {
-        if(t !== telaInicial) {
-            t.style.display = 'none';
-            t.classList.remove('ativa');
-        }
-    });
+    // Mostrar tela inicial
+    mostrarTela(telaInicial);
     
-    // Atualizar texto
+    // CORREÇÃO: Reativar botão
     const btnInicial = document.querySelector('#telaInicial .btn-principal');
     if (btnInicial) {
-        btnInicial.textContent = "👆 CLIQUE AQUI PARA INICIAR";
+        btnInicial.disabled = false;
         btnInicial.onclick = iniciarSessao;
+        btnInicial.style.opacity = "1";
     }
     
-    const subtitle = document.querySelector('#telaInicial .subtitle');
-    if (subtitle) {
-        subtitle.textContent = "Toque para começar a sessão fotográfica";
-    }
-    
-    logControl("✅ Voltou ao início corretamente");
+    logControl("✅ Reset completo");
 }
 
-// Preview das fotos
+function handleMsg(msg){
+    if(msg.type === "end-session"){
+        logControl("📵 Finalizando sessão...");
+        resetToIntro();
+    }
+}
+
+// Restante do código permanece igual...
 function showPreview(dataURL){
     videoCam.style.display = "none";
     overlay.style.display = "none";
@@ -400,7 +389,6 @@ function hidePreview(){
     videoCam.style.display = "block";
 }
 
-// Utilitários
 function blobToDataURL(blob){
     return new Promise(res => { 
         const fr = new FileReader(); 
@@ -413,13 +401,11 @@ function sleep(ms){
     return new Promise(r => setTimeout(r, ms)); 
 }
 
-// Inicializar
 window.addEventListener('load', () => {
-    logControl("🚀 Cabine Fotográfica carregada");
+    logControl("🚀 Sistema carregado");
     connectWS();
     carregarMoldura();
     
-    // CORREÇÃO: Verificar se já está em tela cheia
     if(document.fullscreenElement) {
         telaInicial.style.display = "none";
         telaSessao.style.display = "flex";
