@@ -9,6 +9,10 @@ let fotoCount = 0;
 let maxFotos = 3;
 let isCounting = false;
 
+// Extrair sessionId da URL
+const urlParams = new URLSearchParams(window.location.search);
+sessionId = urlParams.get('session');
+
 const videoInstr = document.getElementById("videoInstr");
 const videoCam = document.getElementById("videoCam");
 const overlay = document.getElementById("overlay");
@@ -20,9 +24,11 @@ videoInstr.loop = true;
 videoInstr.play().catch(()=>{});
 
 function connectWS(){
+  if(ws && ws.readyState === WebSocket.OPEN) return;
+  
   ws = new WebSocket(WS_URL);
   ws.onopen = ()=> {
-    logControl("WS aberto");
+    logControl("WS aberto - Session: " + sessionId);
     ws.send(JSON.stringify({ type: "register", role: "control", sessionId }));
   };
   ws.onmessage = (ev)=>{
@@ -46,6 +52,7 @@ function logControl(msg){
 tapBtn.addEventListener("click", async ()=>{
   tapBtn.style.display = "none";
   await enterFullscreen();
+  startPhotoFlow();
 });
 
 async function enterFullscreen(){
@@ -60,33 +67,50 @@ function handleMsg(msg){
 }
 
 async function resetToIntro(){
-  try{ if(videoCam.srcObject){ videoCam.srcObject.getTracks().forEach(t=>t.stop()); videoCam.srcObject=null; } }catch(e){ logControl("Stop cam fail: "+e);}
+  try{ 
+    if(videoCam.srcObject){ 
+      videoCam.srcObject.getTracks().forEach(t=>t.stop()); 
+      videoCam.srcObject=null; 
+    } 
+  }catch(e){ logControl("Stop cam fail: "+e);}
+  
   videoInstr.style.display="block";
   videoCam.style.display="none";
   overlay.innerText="";
+  overlay.style.display = "flex";
   fotoCount=0;
   isCounting=false;
+  
   if(document.exitFullscreen) document.exitFullscreen().catch(()=>{});
   videoInstr.play().catch(()=>{});
+  tapBtn.style.display = "block";
   logControl("Voltou ao vídeo inicial");
 }
-
-tapBtn.addEventListener("click", startPhotoFlow);
 
 async function startPhotoFlow(){
   if(isCounting || fotoCount>=maxFotos){
     logControl("Ignorando clique: contagem em andamento ou limite atingido");
     return;
   }
+  
   isCounting=true;
+  logControl("Iniciando fluxo de fotos - Foto " + (fotoCount + 1));
+  
   videoInstr.style.display="none";
   videoCam.style.display="block";
 
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:"user", width:{ideal:1920}, height:{ideal:1080} }, audio:false });
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode:"user", width:{ideal:1920}, height:{ideal:1080} }, 
+      audio:false 
+    });
     videoCam.srcObject = stream;
     await videoCam.play();
-  }catch(e){ logControl("Erro câmera: "+e); return; }
+  }catch(e){ 
+    logControl("Erro câmera: "+e); 
+    isCounting = false;
+    return; 
+  }
 
   const mold = new Image();
   mold.crossOrigin="anonymous";
@@ -95,28 +119,44 @@ async function startPhotoFlow(){
   await showOverlayText("Prepare-se para tirar suas fotos",1500);
 
   while(fotoCount<maxFotos){
-    await countdownOverlay(5);
+    await countdownOverlay(3); // Reduzido para 3 segundos
     const blob = await captureFramedPhoto(videoCam, mold);
     const dataURL = await blobToDataURL(blob);
     showPreview(dataURL);
+    
     if(ws && ws.readyState===1){
-      ws.send(JSON.stringify({ type:"photo", sessionId, filename:`photo_${Date.now()}_${fotoCount+1}.jpg`, data:dataURL }));
+      ws.send(JSON.stringify({ 
+        type:"photo", 
+        sessionId, 
+        filename:`photo_${Date.now()}_${fotoCount+1}.jpg`, 
+        data:dataURL 
+      }));
     }
+    
     fotoCount++;
-    await sleep(3000);
-    hidePreview();
-    if(fotoCount===maxFotos){
-      overlay.innerText="✅ Sucesso! Obrigado por utilizar a cabine fotográfica 😃";
-      overlay.style.backgroundColor="rgba(0,0,0,0.7)";
-      overlay.style.color="white";
-      overlay.style.fontSize="4vw";
-      overlay.style.display="flex";
-      overlay.style.alignItems="center";
-      overlay.style.justifyContent="center";
-      overlay.style.height="100%";
-      break;
+    logControl(`Foto ${fotoCount}/${maxFotos} capturada`);
+    
+    if(fotoCount < maxFotos){
+      await sleep(2000);
+      hidePreview();
+      await showOverlayText("Prepare-se para a próxima foto",1000);
     }
   }
+  
+  // Última foto - mostrar mensagem final
+  overlay.innerText="✅ Sucesso! Obrigado por utilizar a cabine fotográfica 😃";
+  overlay.style.backgroundColor="rgba(0,0,0,0.9)";
+  overlay.style.color="white";
+  overlay.style.fontSize="6vw";
+  overlay.style.display="flex";
+  overlay.style.alignItems="center";
+  overlay.style.justifyContent="center";
+  overlay.style.height="100%";
+  
+  setTimeout(() => {
+    resetToIntro();
+  }, 5000);
+  
   isCounting=false;
 }
 
@@ -128,18 +168,28 @@ function captureFramedPhoto(videoEl, moldImage){
     canvasHidden.height=h;
     const ctx = canvasHidden.getContext("2d");
     ctx.drawImage(videoEl,0,0,w,h);
+    
     if(moldImage.complete){
       ctx.drawImage(moldImage,0,0,w,h);
       canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95);
     }else{
-      moldImage.onload=()=>{ ctx.drawImage(moldImage,0,0,w,h); canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95); };
-      moldImage.onerror=()=>{ canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95); };
+      moldImage.onload=()=>{ 
+        ctx.drawImage(moldImage,0,0,w,h); 
+        canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95); 
+      };
+      moldImage.onerror=()=>{ 
+        canvasHidden.toBlob(b=>resolve(b),"image/jpeg",0.95); 
+      };
     }
   });
 }
 
 function blobToDataURL(blob){
-  return new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.readAsDataURL(blob); });
+  return new Promise(res=>{ 
+    const fr=new FileReader(); 
+    fr.onload=()=>res(fr.result); 
+    fr.readAsDataURL(blob); 
+  });
 }
 
 function showPreview(dataURL){
@@ -169,26 +219,45 @@ function hidePreview(){
 
 function showOverlayText(text,ms){
   overlay.innerText=text;
-  return sleep(ms).then(()=> overlay.innerText="");
+  overlay.style.display = "flex";
+  return sleep(ms).then(()=> { 
+    overlay.innerText="";
+    overlay.style.display = "flex";
+  });
 }
 
 function countdownOverlay(sec){
-  return new Promise(async resolve=>{
-    const overlayCount=document.createElement("div");
-    overlayCount.style.position="absolute";
-    overlayCount.style.top="10%";
-    overlayCount.style.width="100%";
-    overlayCount.style.textAlign="center";
-    overlayCount.style.fontSize="12vw";
-    overlayCount.style.zIndex=9999;
-    overlayCount.style.pointerEvents="none";
+  return new Promise(resolve => {
+    const overlayCount = document.createElement("div");
+    overlayCount.style.position = "absolute";
+    overlayCount.style.top = "0";
+    overlayCount.style.left = "0";
+    overlayCount.style.width = "100%";
+    overlayCount.style.height = "100%";
+    overlayCount.style.display = "flex";
+    overlayCount.style.alignItems = "center";
+    overlayCount.style.justifyContent = "center";
+    overlayCount.style.fontSize = "25vw";
+    overlayCount.style.zIndex = 9999;
+    overlayCount.style.pointerEvents = "none";
+    overlayCount.style.backgroundColor = "rgba(0,0,0,0.7)";
     document.body.appendChild(overlayCount);
-    for(let i=sec;i>=1;i--){
-      overlayCount.innerText=i;
-      await sleep(1000);
-    }
-    document.body.removeChild(overlayCount);
-    resolve();
+    
+    let count = sec;
+    
+    const countdown = setInterval(() => {
+      overlayCount.innerText = count;
+      count--;
+      
+      if (count < 0) {
+        clearInterval(countdown);
+        document.body.removeChild(overlayCount);
+        resolve();
+      }
+    }, 1000);
+    
+    // Mostrar primeiro número imediatamente
+    overlayCount.innerText = sec;
   });
 }
 
