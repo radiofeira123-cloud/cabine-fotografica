@@ -19,14 +19,13 @@
       overflow: hidden;
     }
 
-    /* Tela de Início */
-    #telaInicio {
+    /* Telas */
+    .tela {
       position: absolute;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: linear-gradient(135deg, #002250 0%, #0044aa 100%);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -35,37 +34,39 @@
       transition: opacity 0.8s ease;
     }
 
+    #telaInicial {
+      background: linear-gradient(135deg, #002250 0%, #0044aa 100%);
+    }
+
+    #telaSessao {
+      background: linear-gradient(135deg, #002250 0%, #0044aa 100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #telaSessao.ativa {
+      opacity: 1;
+      pointer-events: all;
+    }
+
     .logo {
       width: 120px;
       height: 120px;
-      background: rgba(255,255,255,0.1);
-      border-radius: 50%;
+      margin-bottom: 30px;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin-bottom: 30px;
-      border: 3px solid rgba(255,255,255,0.2);
     }
 
-    .logo-inner {
-      width: 80px;
-      height: 80px;
-      background: #fff;
+    .logo-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
       border-radius: 20px;
-      position: relative;
-    }
-
-    .logo-inner::before {
-      content: "📸";
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 40px;
     }
 
     h1 {
-      font-size: 3.5rem;
+      font-size: 2.5rem;
       margin-bottom: 10px;
       text-align: center;
       background: linear-gradient(45deg, #fff, #a0d0ff);
@@ -75,17 +76,18 @@
     }
 
     .subtitle {
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       opacity: 0.8;
-      margin-bottom: 50px;
+      margin-bottom: 40px;
       text-align: center;
+      padding: 0 20px;
     }
 
-    .btn-iniciar {
+    .btn-principal {
       background: linear-gradient(45deg, #00c6ff, #0072ff);
       border: none;
-      padding: 20px 40px;
-      font-size: 1.3rem;
+      padding: 18px 36px;
+      font-size: 1.2rem;
       font-weight: bold;
       color: white;
       border-radius: 50px;
@@ -96,28 +98,13 @@
       overflow: hidden;
     }
 
-    .btn-iniciar:hover {
+    .btn-principal:hover {
       transform: translateY(-3px);
       box-shadow: 0 15px 40px rgba(0, 114, 255, 0.6);
     }
 
-    .btn-iniciar:active {
+    .btn-principal:active {
       transform: translateY(0);
-    }
-
-    .btn-iniciar::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: -100%;
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-      transition: left 0.5s;
-    }
-
-    .btn-iniciar:hover::after {
-      left: 100%;
     }
 
     /* Telas de Transição */
@@ -144,31 +131,34 @@
     }
 
     .icone-grande {
-      font-size: 8rem;
+      font-size: 6rem;
       margin-bottom: 30px;
       animation: pulse 2s infinite;
     }
 
     .mensagem-principal {
-      font-size: 3rem;
+      font-size: 2.5rem;
       font-weight: bold;
       margin-bottom: 20px;
       text-align: center;
+      padding: 0 20px;
     }
 
     .mensagem-secundaria {
-      font-size: 1.5rem;
+      font-size: 1.3rem;
       opacity: 0.8;
       text-align: center;
+      padding: 0 20px;
     }
 
     /* Contador */
     .contador {
-      font-size: 12rem;
+      font-size: 8rem;
       font-weight: bold;
       color: #00c6ff;
       text-shadow: 0 0 30px rgba(0, 198, 255, 0.7);
       animation: zoomInOut 1s ease;
+      margin-bottom: 20px;
     }
 
     /* Tela Final */
@@ -178,24 +168,31 @@
 
     .lista-fotos {
       display: flex;
-      gap: 20px;
+      gap: 15px;
       margin-top: 30px;
     }
 
     .miniatura {
-      width: 80px;
-      height: 80px;
+      width: 60px;
+      height: 60px;
       border-radius: 10px;
       border: 2px solid rgba(255,255,255,0.3);
       background: rgba(255,255,255,0.1);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      transition: all 0.3s ease;
     }
 
-    /* Elementos existentes (mantidos) */
-    #videoInstr, #videoCam {
+    .miniatura.concluida {
+      background: linear-gradient(45deg, #00c6ff, #0072ff);
+      transform: scale(1.1);
+    }
+
+    /* Elementos da câmera */
+    #videoCam {
       position: absolute;
       top: 0;
       left: 0;
@@ -203,6 +200,7 @@
       height: 100%;
       object-fit: cover;
       display: none;
+      transform: scaleX(-1); /* Espelhar a câmera */
     }
 
     #overlay {
@@ -219,22 +217,6 @@
       font-size: 6vw;
       font-weight: bold;
       text-align: center;
-    }
-
-    #tapBtnLayer {
-      position: absolute;
-      bottom: 6%;
-      width: 100%;
-      display: flex;
-      justify-content: center;
-      z-index: 6;
-    }
-
-    #tapBtn {
-      padding: 16px 24px;
-      font-size: 20px;
-      pointer-events: auto;
-      display: none;
     }
 
     #canvasHidden {
@@ -262,17 +244,45 @@
     .slide-in {
       animation: slideIn 0.8s ease;
     }
+
+    /* Loading */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-left: 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
-  <!-- Nova Tela de Início -->
-  <div id="telaInicio">
+  <!-- Tela Inicial - Apenas tela cheia -->
+  <div id="telaInicial" class="tela">
     <div class="logo">
-      <div class="logo-inner"></div>
+      <div class="logo-img">📸</div>
     </div>
     <h1 class="slide-in">CABINE FOTOGRÁFICA</h1>
-    <p class="subtitle slide-in">Capture momentos incríveis em 3 clicks</p>
-    <button class="btn-iniciar slide-in" onclick="iniciarSessao()">
+    <p class="subtitle slide-in">Toque para entrar em tela cheia</p>
+    <button class="btn-principal slide-in" onclick="entrarTelaCheia()">
+      📱 ENTRAR EM TELA CHEIA
+    </button>
+  </div>
+
+  <!-- Tela de Sessão (aparece após tela cheia) -->
+  <div id="telaSessao" class="tela">
+    <div class="logo">
+      <div class="logo-img">📸</div>
+    </div>
+    <h1>PRONTO PARA COMEÇAR?</h1>
+    <p class="subtitle">Sessão fotográfica com 3 fotos automáticas</p>
+    <button class="btn-principal" onclick="iniciarSessao()">
       🚀 INICIAR SESSÃO
     </button>
   </div>
@@ -290,25 +300,21 @@
   </div>
 
   <div id="telaFinal" class="tela-transicao">
-    <div class="icone-grande">✅</div>
+    <div class="logo">
+      <div class="logo-img">✅</div>
+    </div>
     <div class="mensagem-principal">FOTOS CONCLUÍDAS!</div>
     <div class="mensagem-secundaria">Aguarde o operador finalizar a sessão</div>
     <div class="lista-fotos">
-      <div class="miniatura">1</div>
-      <div class="miniatura">2</div>
-      <div class="miniatura">3</div>
+      <div class="miniatura" id="miniatura1">1</div>
+      <div class="miniatura" id="miniatura2">2</div>
+      <div class="miniatura" id="miniatura3">3</div>
     </div>
   </div>
 
-  <!-- Elementos originais (para compatibilidade) -->
-  <video id="videoInstr" autoplay muted loop playsinline></video>
+  <!-- Elementos da câmera -->
   <video id="videoCam" autoplay playsinline></video>
   <div id="overlay"></div>
-
-  <div id="tapBtnLayer">
-    <button id="tapBtn">Abrir Tela Cheia</button>
-  </div>
-
   <canvas id="canvasHidden"></canvas>
 
   <script src="controle.js"></script>
