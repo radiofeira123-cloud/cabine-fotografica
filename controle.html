@@ -1,5 +1,29 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head><meta charset="UTF-8"><title>Cabine - Controle</title></head>
-<body><h1>Celular Controle</h1><script src="controle.js"></script></body>
+<head>
+  <meta charset="UTF-8">
+  <title>Cabine - Controle</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+  <style>
+    html,body { margin:0; height:100%; background:#000; color:#fff; font-family:sans-serif; }
+    #videoInstr, #videoCam { position: absolute; top:0; left:0; width:100%; height:100%; object-fit:cover; }
+    #overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:5; font-size:6vw; font-weight:bold; text-align:center; }
+    #tapBtnLayer{ position: absolute; bottom: 6%; width:100%; display:flex; justify-content:center; z-index:6; }
+    #tapBtn { padding:16px 24px; font-size:20px; pointer-events:auto; }
+    #canvasHidden{ display:none; }
+  </style>
+</head>
+<body>
+  <video id="videoInstr" autoplay muted loop playsinline></video>
+  <video id="videoCam" autoplay playsinline></video>
+  <div id="overlay"></div>
+
+  <div id="tapBtnLayer">
+    <button id="tapBtn">Abrir Tela Cheia</button>
+  </div>
+
+  <canvas id="canvasHidden"></canvas>
+
+  <script src="controle.js"></script>
+</body>
 </html>
